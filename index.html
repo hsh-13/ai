@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 학업 플래너</title>
+<link rel="stylesheet" href="CSS/style.css">
+</head>
+<body>
+
+<main>
+<div class="app-shell">
+  <div class="appbar"><strong id="appTitle">AI 학업 플래너</strong></div>
+
+  <section class="view active" id="view-home">
+    <h1>오늘의 학업 현황</h1><p class="sub" id="todayLabel">오늘 해야 할 일을 확인하세요.</p>
+    <div class="grid2">
+      <div class="stat"><span class="tiny">전체 일정</span><b id="totalCount">0개</b></div>
+      <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b></div>
+    </div>
+    <div class="card"><div class="card-title"><span>학습 진행 현황</span><span id="completionText" class="tiny">0 / 0 완료</span></div><div class="progress"><i id="completionBar" style="width:0%"></i></div></div>
+    <h2>오늘의 일정</h2><div class="card" id="todayTasks"></div>
+    <h2>AI 우선순위 추천</h2><div class="card" id="homeRecommendation"></div>
+    <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
+  </section>
+
+  <section class="view" id="view-schedule">
+    <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
+    <div class="week" id="weekGrid"></div>
+    <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
+    <div class="notice" id="staleNotice" hidden>일정이 변경되었습니다. 기존 AI 분석 결과는 유지되며, 다시 분석 버튼을 눌러 갱신할 수 있습니다.</div>
+  </section>
+
+  <section class="view" id="view-analysis">
+    <h1>AI 학업 분석</h1><p class="sub">마감일·중요도·예상 소요 시간을 기준으로 우선순위를 계산합니다.</p>
+    <div id="analysisContent"></div>
+    <button class="btn primary full" onclick="runAnalysis()">✦ 지금 분석하기 / 다시 분석하기</button>
+    <p class="tiny" style="margin-top:9px">현재는 Mock 분석 모드입니다. 우선순위는 브라우저의 규칙 기반 계산으로 제공되며 실제 Gemini API는 연결되지 않았습니다.</p>
+  </section>
+
+  <section class="view" id="view-settings">
+    <h1>설정</h1><p class="sub">앱 정보와 저장된 데이터를 관리합니다.</p>
+    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>Prototype v5</span></div></div>
+    <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
+    <div class="notice">로그인 없이 사용합니다. 데이터는 현재 브라우저의 localStorage에 저장됩니다. 다른 기기와 자동 동기화되지는 않습니다.</div>
+  </section>
+
+  <section class="view" id="view-form">
+    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+    <h1 id="formHeading">일정 등록</h1><p class="sub">직접 입력하거나 파일·URL에서 정보를 가져오는 흐름을 확인할 수 있습니다.</p>
+    <div class="tabs"><button class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button data-tab="file" onclick="switchTab('file')">파일 업로드</button><button data-tab="url" onclick="switchTab('url')">URL 입력</button></div>
+    <div id="tab-direct">
+      <div class="field"><label>일정명 *</label><input id="fTitle" placeholder="예: 자료구조 과제 제출"></div>
+      <div class="field"><label>일정 종류 *</label><select id="fType"><option>과제</option><option>시험</option><option>발표</option><option>팀 프로젝트</option></select></div>
+      <div class="field"><label>마감 날짜 *</label><input id="fDate" type="date"></div>
+      <div class="field"><label>중요도</label><select id="fImportance"><option>높음</option><option selected>보통</option><option>낮음</option></select></div>
+      <div class="field"><label>예상 소요 시간</label><select id="fEffort"><option value="30">30분</option><option value="60" selected>1시간</option><option value="120">2시간</option><option value="180">3시간</option><option value="300">5시간 이상</option></select></div>
+      <div class="field"><label>진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
+    </div>
+    <div id="tab-file" class="hidden">
+      <div class="field"><label>안내문 파일 선택 (PNG, JPG, JPEG, PDF)</label><input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.pdf"></div>
+      <div class="notice">프로토타입에서는 실제 OCR/AI 추출을 실행하지 않습니다. 파일을 선택한 뒤 예시 정보 채우기를 누르면 확인용 샘플이 입력됩니다.</div>
+      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
+    </div>
+    <div id="tab-url" class="hidden">
+      <div class="field"><label>공개 웹페이지 URL</label><input id="urlInput" type="url" placeholder="https://example.com/notice"></div>
+      <div class="notice">실제 웹페이지 접속 및 Gemini 추출은 아직 연결되지 않았습니다. 공개 페이지를 가정한 예시 입력을 확인할 수 있습니다.</div>
+      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
+    </div>
+    <div class="row" style="margin-top:17px"><button class="btn" onclick="navigate('schedule')">취소</button><button class="btn primary" onclick="saveTask()">저장하기</button></div>
+  </section>
+
+  <section class="view" id="view-detail">
+    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+    <div id="detailContent"></div>
+  </section>
+
+  <nav class="nav">
+    <button data-nav="home" class="active" onclick="navigate('home')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9M9 21v-7h6v7"/></svg></b>홈</button>
+    <button data-nav="schedule" onclick="navigate('schedule')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg></b>일정</button>
+    <button data-nav="analysis" onclick="navigate('analysis')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/><path d="m19 16 .9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16Z"/></svg></b>AI 분석</button>
+    <button data-nav="settings" onclick="navigate('settings')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 0 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3H3.7a1.8 1.8 0 0 1 0-3.6h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 0 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 0 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 0 1 0 3.6h-.2a1.8 1.8 0 0 0-.9 3Z"/></svg></b>설정</button>
+  </nav>
+</div>
+
+</main>
+
+<div class="modal-backdrop" id="resetModal"><div class="modal"><h3>모든 데이터를 초기화할까요?</h3><p>저장된 일정과 최근 분석 결과가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script src="JS/app.js" defer></script>
+</body>
+</html>
