@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 학업 플래너 | Interactive Prototype v3</title>
+<style>
+:root{--bg:#f3f4f6;--paper:#fff;--ink:#252a30;--muted:#737b84;--line:#dfe3e7;--dark:#343a40;--soft:#eceff1;--blue:#eaf1ff;--blueink:#315b9b;--red:#a33b3b;--green:#eaf4ed}
+*{box-sizing:border-box}body{margin:0;background:#e9ecef;color:var(--ink);font-family:Arial,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(16px,calc((100vw - 1180px)/2));position:sticky;top:0;z-index:20}
+.brand{font-weight:800;font-size:16px}.brand small{font-size:11px;color:var(--muted);font-weight:500;margin-left:8px}.header-right{font-size:11px;color:var(--muted)}
+main{max-width:1180px;margin:auto;padding:22px 16px 50px}
+.app-shell{width:min(100%,430px);margin:0 auto;background:var(--bg);border:1px solid #cfd4d9;border-radius:25px;overflow:hidden;min-height:780px;box-shadow:0 12px 35px #20283218;display:flex;flex-direction:column}
+.appbar{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 17px;flex:none}
+.appbar strong{font-size:15px}.appbar span{font-size:10px;color:var(--muted)}
+.view{display:none;padding:17px 16px 22px;flex:1;min-height:660px}.view.active{display:block}
+h1{font-size:20px;margin:0 0 5px}h2{font-size:15px;margin:20px 0 10px}h3{font-size:13px;margin:0 0 8px}
+.sub{font-size:11px;color:var(--muted);line-height:1.55;margin:0 0 15px}
+.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px;margin:9px 0}
+.card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;margin-bottom:8px}
+.muted{color:var(--muted)}.tiny{font-size:10px;color:var(--muted)}
+.btn{border:1px solid #cbd1d7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:8px;font-size:11px;font-weight:600}
+.btn.primary{background:var(--dark);color:#fff;border-color:var(--dark)}.btn.danger{color:var(--red);border-color:#e5caca}.btn.small{padding:7px 9px;font-size:10px}.btn.full{width:100%;margin-top:8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.stat b{display:block;font-size:21px;margin-top:5px}
+.progress{height:7px;background:#e7e9ec;border-radius:20px;overflow:hidden;margin:8px 0}.progress i{display:block;height:100%;background:#555e67;border-radius:20px}
+.pill{display:inline-block;background:var(--soft);border-radius:20px;padding:4px 7px;font-size:9px;color:#525b64}
+.task{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #edf0f2}.task:last-child{border:0}.task-name{font-size:11px;font-weight:700}.task-meta{font-size:10px;color:var(--muted);margin-top:4px}
+.task-actions{display:flex;gap:5px;align-items:center}.task-actions button{border:0;background:#f0f2f4;border-radius:6px;padding:6px;font-size:10px}
+.nav{height:62px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:5px 6px;flex:none}
+.nav button{border:0;background:transparent;color:#818890;border-radius:8px;font-size:9px}.nav button b{display:block;font-size:17px;margin-bottom:3px}.nav button.active{background:#eff1f3;color:#252a30;font-weight:700}
+.field{margin:11px 0}.field label{display:block;font-size:10px;font-weight:700;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;border:1px solid #d6dbe0;background:#fff;border-radius:8px;padding:10px;font-size:11px;color:var(--ink)}.field textarea{min-height:70px;resize:vertical}
+.tabs{display:flex;gap:5px;margin:12px 0}.tabs button{flex:1;padding:9px 4px;border:1px solid var(--line);background:#fff;border-radius:7px;font-size:10px}.tabs button.active{background:var(--dark);color:#fff;border-color:var(--dark)}
+.week-head{display:flex;align-items:center;justify-content:space-between}.week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0}.day{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 0;text-align:center;font-size:9px;color:var(--muted)}.day b{display:block;color:var(--ink);font-size:11px;margin-top:4px}.day.selected{background:var(--dark);color:#fff;border-color:var(--dark)}.day.selected b{color:#fff}.day.today:not(.selected){border-color:#6c7782}
+.empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:11px;line-height:1.6}
+.priority-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-size:10px;margin:10px 0}.scorebar{height:6px;background:#eceff1;border-radius:10px;margin-top:5px;overflow:hidden}.scorebar i{display:block;height:100%;background:#59616a}
+.notice{background:var(--blue);border:1px solid #d4e1fa;color:var(--blueink);padding:9px;border-radius:8px;font-size:10px;line-height:1.5;margin:10px 0}
+.fab{position:sticky;float:right;bottom:8px;border:0;background:var(--dark);color:#fff;width:43px;height:43px;border-radius:50%;font-size:23px;box-shadow:0 3px 10px #0002}
+.back{border:0;background:transparent;padding:0;color:var(--muted);font-size:11px;margin-bottom:13px}
+.hidden{display:none!important}
+.modal-backdrop{position:fixed;inset:0;background:#11182077;display:none;align-items:center;justify-content:center;padding:18px;z-index:40}.modal-backdrop.show{display:flex}.modal{width:min(100%,360px);background:#fff;border-radius:14px;padding:18px;box-shadow:0 15px 40px #0003}.modal h3{font-size:15px}.modal p{font-size:11px;color:var(--muted);line-height:1.6}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#252a30;color:white;padding:11px 15px;border-radius:8px;font-size:11px;z-index:60;opacity:0;transition:.2s;pointer-events:none;max-width:90%;text-align:center}.toast.show{opacity:1}
+footer{max-width:430px;margin:13px auto 0;color:#69727b;font-size:10px;line-height:1.6}
+@media(max-width:500px){body{background:var(--bg)}header{padding:0 13px}.header-right{display:none}main{padding:0}.app-shell{width:100%;border:0;border-radius:0;min-height:calc(100dvh - 58px);box-shadow:none}.view{min-height:calc(100dvh - 120px)}footer{padding:0 14px 18px}}
+</style>
+</head>
+<body>
+<header><div class="brand">AI 학업 플래너 <small>Interactive Prototype v3</small></div><div class="header-right">실제 화면 이동 · 일정 CRUD · 브라우저 저장</div></header>
+<main>
+<div class="app-shell">
+  <div class="appbar"><strong id="appTitle">홈</strong><span>Wireframe v3</span></div>
+
+  <section class="view active" id="view-home">
+    <h1>오늘의 학업 현황</h1><p class="sub" id="todayLabel">오늘 해야 할 일을 확인하세요.</p>
+    <div class="grid2">
+      <div class="stat"><span class="tiny">전체 일정</span><b id="totalCount">0개</b></div>
+      <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b></div>
+    </div>
+    <div class="card"><div class="card-title"><span>학습 진행 현황</span><span id="completionText" class="tiny">0 / 0 완료</span></div><div class="progress"><i id="completionBar" style="width:0%"></i></div></div>
+    <h2>오늘의 일정</h2><div class="card" id="todayTasks"></div>
+    <h2>AI 우선순위 추천</h2><div class="card" id="homeRecommendation"></div>
+    <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
+  </section>
+
+  <section class="view" id="view-schedule">
+    <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
+    <div class="week" id="weekGrid"></div>
+    <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
+    <div class="notice" id="staleNotice" hidden>일정이 변경되었습니다. 기존 AI 분석 결과는 유지되며, 다시 분석 버튼을 눌러 갱신할 수 있습니다.</div>
+  </section>
+
+  <section class="view" id="view-analysis">
+    <h1>AI 학업 분석</h1><p class="sub">마감일·중요도·예상 소요 시간을 기준으로 우선순위를 계산합니다.</p>
+    <div id="analysisContent"></div>
+    <button class="btn primary full" onclick="runAnalysis()">✦ 지금 분석하기 / 다시 분석하기</button>
+    <p class="tiny" style="margin-top:9px">현재 v3는 API 연결 전 프로토타입으로, 분석 결과는 브라우저에서 예시 규칙으로 계산됩니다.</p>
+  </section>
+
+  <section class="view" id="view-settings">
+    <h1>설정</h1><p class="sub">앱 정보와 저장된 데이터를 관리합니다.</p>
+    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>Interactive v3</span></div></div>
+    <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
+    <div class="notice">로그인 없이 사용합니다. 데이터는 현재 브라우저의 localStorage에 저장됩니다. 다른 기기와 자동 동기화되지는 않습니다.</div>
+  </section>
+
+  <section class="view" id="view-form">
+    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+    <h1 id="formHeading">일정 등록</h1><p class="sub">직접 입력하거나 파일·URL에서 정보를 가져오는 흐름을 확인할 수 있습니다.</p>
+    <div class="tabs"><button class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button data-tab="file" onclick="switchTab('file')">파일 업로드</button><button data-tab="url" onclick="switchTab('url')">URL 입력</button></div>
+    <div id="tab-direct">
+      <div class="field"><label>일정명 *</label><input id="fTitle" placeholder="예: 자료구조 과제 제출"></div>
+      <div class="field"><label>일정 종류 *</label><select id="fType"><option>과제</option><option>시험</option><option>발표</option><option>팀 프로젝트</option></select></div>
+      <div class="field"><label>마감 날짜 *</label><input id="fDate" type="date"></div>
+      <div class="field"><label>중요도</label><select id="fImportance"><option>높음</option><option selected>보통</option><option>낮음</option></select></div>
+      <div class="field"><label>예상 소요 시간</label><select id="fEffort"><option value="30">30분</option><option value="60" selected>1시간</option><option value="120">2시간</option><option value="180">3시간</option><option value="300">5시간 이상</option></select></div>
+      <div class="field"><label>진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
+    </div>
+    <div id="tab-file" class="hidden">
+      <div class="field"><label>안내문 파일 선택 (PNG, JPG, JPEG, PDF)</label><input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.pdf"></div>
+      <div class="notice">프로토타입에서는 실제 OCR/AI 추출을 실행하지 않습니다. 파일을 선택한 뒤 예시 정보 채우기를 누르면 확인용 샘플이 입력됩니다.</div>
+      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
+    </div>
+    <div id="tab-url" class="hidden">
+      <div class="field"><label>공개 웹페이지 URL</label><input id="urlInput" type="url" placeholder="https://example.com/notice"></div>
+      <div class="notice">실제 웹페이지 접속 및 Gemini 추출은 아직 연결되지 않았습니다. 공개 페이지를 가정한 예시 입력을 확인할 수 있습니다.</div>
+      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
+    </div>
+    <div class="row" style="margin-top:17px"><button class="btn" onclick="navigate('schedule')">취소</button><button class="btn primary" onclick="saveTask()">저장하기</button></div>
+  </section>
+
+  <section class="view" id="view-detail">
+    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+    <div id="detailContent"></div>
+  </section>
+
+  <nav class="nav">
+    <button data-nav="home" class="active" onclick="navigate('home')"><b>⌂</b>홈</button>
+    <button data-nav="schedule" onclick="navigate('schedule')"><b>▦</b>일정</button>
+    <button data-nav="analysis" onclick="navigate('analysis')"><b>✦</b>AI 분석</button>
+    <button data-nav="settings" onclick="navigate('settings')"><b>⚙</b>설정</button>
+  </nav>
+</div>
+<footer>v3 상호작용 프로토타입 · 일정 등록/수정/삭제, 상태 변경, 캘린더 날짜 선택, 우선순위 분석, 브라우저 저장을 테스트할 수 있습니다. Gemini API 및 실제 파일·URL 정보 추출은 별도 개발이 필요합니다.</footer>
+</main>
+
+<div class="modal-backdrop" id="resetModal"><div class="modal"><h3>모든 데이터를 초기화할까요?</h3><p>저장된 일정과 최근 분석 결과가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY='aiStudyPlannerV3Tasks';
+const ANALYSIS_KEY='aiStudyPlannerV3Analysis';
+let tasks=loadTasks(), analysis=loadAnalysis(), currentView='home', selectedDate=isoDate(new Date()), weekOffset=0, editingId=null;
+const $=id=>document.getElementById(id);
+function loadTasks(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){return []}}
+function loadAnalysis(){try{return JSON.parse(localStorage.getItem(ANALYSIS_KEY))}catch(e){return null}}
+function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks));$('settingsCount').textContent=tasks.length+'개'}
+function isoDate(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
+function dateObj(s){return new Date(s+'T12:00:00')}
+function fmt(s){if(!s)return '-';const d=dateObj(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+function navigate(view){currentView=view;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===view));const titles={home:'홈',schedule:'일정 관리',analysis:'AI 분석',settings:'설정',form:editingId?'일정 수정':'일정 등록',detail:'일정 상세'};$('appTitle').textContent=titles[view]||view;if(view==='home')renderHome();if(view==='schedule')renderSchedule();if(view==='analysis')renderAnalysis();if(view==='settings')$('settingsCount').textContent=tasks.length+'개';if(view==='detail')renderDetail()}
+function markStale(){ $('staleNotice').hidden=!analysis; }
+function renderHome(){
+ const done=tasks.filter(t=>t.status==='완료').length,rate=tasks.length?Math.round(done/tasks.length*100):0;
+ $('todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{dateStyle:'full'}).format(new Date());
+ $('totalCount').textContent=tasks.length+'개';$('completionRate').textContent=rate+'%';$('completionText').textContent=`${done} / ${tasks.length} 완료`;$('completionBar').style.width=rate+'%';
+ const todays=tasks.filter(t=>t.date===isoDate(new Date())).sort((a,b)=>a.title.localeCompare(b.title));
+ $('todayTasks').innerHTML=todays.length?todays.map(taskRow).join(''):'<div class="empty">오늘 등록된 일정이 없습니다.<br>일정 관리에서 새 일정을 추가해 보세요.</div>';
+ const rec=analysis?.items?.[0];$('homeRecommendation').innerHTML=rec?`<div class="card-title"><span>오늘 먼저 할 일정</span><span class="pill">${rec.grade} · ${rec.score}점</span></div><b>${escapeHtml(rec.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(rec.reason)}</p>`:'<div class="empty">아직 분석 결과가 없습니다.<br>AI 분석 화면에서 분석을 실행해 보세요.</div>';
+}
+function taskRow(t){return `<div class="task"><div style="min-width:0;flex:1"><div class="task-name">${escapeHtml(t.title)}</div><div class="task-meta">${escapeHtml(t.type)} · ${fmt(t.date)} · ${escapeHtml(t.status)}</div></div><div class="task-actions"><button onclick="openDetail('${t.id}')">상세</button></div></div>`}
+function startOfWeek(d){const x=new Date(d);x.setHours(12,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+function renderSchedule(){
+ const base=startOfWeek(dateObj(selectedDate));base.setDate(base.getDate()+weekOffset*7);
+ const names=['월','화','수','목','금','토','일'];$('weekGrid').innerHTML=names.map((n,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);const s=isoDate(d);return `<button class="day ${s===selectedDate?'selected':''} ${s===isoDate(new Date())?'today':''}" onclick="selectDate('${s}')">${n}<b>${d.getDate()}</b></button>`}).join('');
+ $('selectedDateLabel').textContent=fmt(selectedDate)+' 일정';
+ const list=tasks.filter(t=>t.date===selectedDate).sort((a,b)=>a.title.localeCompare(b.title));
+ $('selectedTasks').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">선택한 날짜에 일정이 없습니다.</div>';markStale();
+}
+function selectDate(s){selectedDate=s;weekOffset=0;renderSchedule()}
+function shiftWeek(n){weekOffset+=n;renderSchedule()}
+function openAdd(){editingId=null;clearForm();$('formHeading').textContent='일정 등록';switchTab('direct');$('fDate').value=selectedDate||isoDate(new Date());navigate('form')}
+function openDetail(id){editingId=id;navigate('detail')}
+function renderDetail(){
+ const t=tasks.find(x=>x.id===editingId);if(!t){$('detailContent').innerHTML='<div class="empty">일정을 찾을 수 없습니다.</div>';return}
+ $('detailContent').innerHTML=`<h1>${escapeHtml(t.title)}</h1><p class="sub">등록된 일정의 내용을 확인하고 수정할 수 있습니다.</p><div class="card"><div class="task"><span>종류</span><b>${escapeHtml(t.type)}</b></div><div class="task"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="task"><span>중요도</span><b>${escapeHtml(t.importance)}</b></div><div class="task"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div><div class="task"><span>진행 상태</span><select onchange="changeStatus('${t.id}',this.value)" style="padding:7px;border:1px solid #ddd;border-radius:6px;font-size:10px"><option ${t.status==='시작 전'?'selected':''}>시작 전</option><option ${t.status==='진행 중'?'selected':''}>진행 중</option><option ${t.status==='완료'?'selected':''}>완료</option></select></div></div>${analysis?.items?.find(x=>x.id===t.id)?`<div class="card"><h3>최근 AI 분석</h3><p class="sub">${escapeHtml(analysis.items.find(x=>x.id===t.id).reason)}</p></div>`:''}<button class="btn primary full" onclick="editTask('${t.id}')">일정 수정</button><button class="btn danger full" onclick="deleteTask('${t.id}')">일정 삭제</button>`;
+}
+function effortLabel(m){return m>=300?'5시간 이상':m>=180?'3시간':m>=120?'2시간':m>=60?'1시간':'30분'}
+function changeStatus(id,status){const t=tasks.find(x=>x.id===id);if(t){t.status=status;persist();markStale();renderDetail();toast('진행 상태가 변경되었습니다.');}}
+function editTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;editingId=id;$('formHeading').textContent='일정 수정';$('fTitle').value=t.title;$('fType').value=t.type;$('fDate').value=t.date;$('fImportance').value=t.importance;$('fEffort').value=t.effort;$('fStatus').value=t.status;switchTab('direct');navigate('form')}
+function deleteTask(id){if(!confirm('이 일정을 삭제할까요?'))return;tasks=tasks.filter(t=>t.id!==id);persist();markStale();navigate('schedule');toast('일정이 삭제되었습니다.')}
+function clearForm(){['fTitle','fDate'].forEach(id=>$(id).value='');$('fType').value='과제';$('fImportance').value='보통';$('fEffort').value='60';$('fStatus').value='시작 전';}
+function switchTab(tab){['direct','file','url'].forEach(x=>{$('tab-'+x).classList.toggle('hidden',x!==tab);document.querySelector(`[data-tab="${x}"]`).classList.toggle('active',x===tab)})}
+function fillSample(){if($('fileInput').files.length===0&&document.querySelector('[data-tab="file"]').classList.contains('active')){toast('먼저 파일을 선택해 주세요.');return} $('fTitle').value='자료구조 과제 제출';$('fType').value='과제';$('fDate').value=isoDate(new Date());$('fImportance').value='보통';$('fEffort').value='120';$('fStatus').value='시작 전';switchTab('direct');toast('예시 추출값을 입력했습니다. 내용을 확인하고 수정하세요.')}
+function saveTask(){
+ const title=$('fTitle').value.trim(),date=$('fDate').value;if(!title||!date){toast('일정명과 마감 날짜를 입력해 주세요.');return}
+ const data={title,type:$('fType').value,date,importance:$('fImportance').value,effort:Number($('fEffort').value),status:$('fStatus').value};
+ if(editingId){const t=tasks.find(x=>x.id===editingId);Object.assign(t,data);toast('일정이 수정되었습니다.')}else{tasks.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),...data});toast('일정이 등록되었습니다.')}
+ persist();markStale();selectedDate=date;weekOffset=0;navigate('schedule');
+}
+function scoreTask(t){const days=Math.ceil((dateObj(t.date)-dateObj(isoDate(new Date())))/86400000);const deadline=days<0?100:days===0?100:days===1?85:days<=3?70:days<=7?50:25;const importance={높음:100,보통:60,낮음:30}[t.importance]||60;const effort=t.effort>=300?90:t.effort>=180?75:t.effort>=120?60:t.effort>=60?40:25;let score=Math.round(deadline*.5+importance*.3+effort*.2);if(t.status==='완료')score=0;return {score,days}}
+function runAnalysis(){
+ if(!tasks.length){toast('먼저 일정을 등록해 주세요.');navigate('schedule');return}
+ const items=tasks.map(t=>{const {score,days}=scoreTask(t);const grade=score>=75?'높음':score>=50?'보통':'낮음';let reason=days<0?'마감일이 지났습니다.':days===0?'마감일이 오늘입니다.':`마감까지 ${days}일 남았습니다.`;reason+=` 중요도 ${t.importance}, 예상 소요 시간 ${effortLabel(t.effort)}을 반영했습니다.`;let action=t.status==='완료'?'완료된 일정입니다.':days<=1?'남은 작업을 확인하고 제출 또는 준비를 마무리하세요.':'작업을 작은 단계로 나누고 첫 단계부터 진행하세요.';return {id:t.id,title:t.title,score,grade,reason,action,status:t.status}}).sort((a,b)=>b.score-a.score);
+ analysis={createdAt:new Date().toISOString(),items};localStorage.setItem(ANALYSIS_KEY,JSON.stringify(analysis));renderAnalysis();renderHome();toast('우선순위 분석이 완료되었습니다.');
+}
+function renderAnalysis(){
+ if(!analysis){$('analysisContent').innerHTML=tasks.length?'<div class="card empty">아직 분석 결과가 없습니다.<br>아래 버튼을 눌러 분석을 시작하세요.</div>':'<div class="card empty">등록된 일정이 없습니다.<br>일정을 먼저 추가해 주세요.</div>';return}
+ const first=analysis.items.find(x=>x.status!=='완료')||analysis.items[0];
+ $('analysisContent').innerHTML=`<div class="card"><div class="card-title"><span>오늘 가장 먼저 할 일정</span><span class="pill">${first.grade} · ${first.score}점</span></div><b>${escapeHtml(first.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(first.reason)}</p><p class="sub" style="margin:5px 0 0">행동 추천: ${escapeHtml(first.action)}</p></div><h2>일정별 우선순위</h2>${analysis.items.map(x=>`<div class="card"><div class="card-title"><span>${escapeHtml(x.title)}</span><span class="pill">${x.grade} · ${x.score}점</span></div><div class="scorebar"><i style="width:${x.score}%"></i></div><p class="sub"><b>분석 이유</b><br>${escapeHtml(x.reason)}</p><p class="sub"><b>행동 추천</b><br>${escapeHtml(x.action)}</p></div>`).join('')}<p class="tiny">마지막 분석: ${new Date(analysis.createdAt).toLocaleString('ko-KR')}</p>`;
+}
+function showResetModal(){$('resetModal').classList.add('show')}function hideResetModal(){$('resetModal').classList.remove('show')}
+function confirmReset(){tasks=[];analysis=null;localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(ANALYSIS_KEY);hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
+function init(){persist();renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
+init();
+</script>
+</body>
+</html>
