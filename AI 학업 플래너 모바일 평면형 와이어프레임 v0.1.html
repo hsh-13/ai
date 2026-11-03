@@ -1,0 +1,331 @@
+
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 학업 플래너 | 평면형 와이어프레임 v0.1</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#e6e6e6;color:#222;font-family:Arial,"Noto Sans KR",sans-serif}
+header{background:#fff;border-bottom:1px solid #bbb;padding:22px 28px}
+header .meta{font-size:11px;letter-spacing:1.5px;color:#777;font-weight:bold}
+header h1{font-size:22px;margin:7px 0 5px}
+header p{font-size:12px;color:#666;margin:0}
+.board{padding:25px;overflow-x:auto}
+.frames{display:grid;grid-template-columns:repeat(4,minmax(250px,1fr));gap:22px;min-width:1080px;align-items:start}
+.frame-wrap{min-width:0}
+.frame-title{display:flex;justify-content:space-between;align-items:center;margin:0 0 9px;font-size:12px;font-weight:bold}
+.frame-title span{font-size:10px;color:#777;font-weight:normal}
+.screen{background:#fff;border:1px solid #888;min-height:720px;position:relative;padding:14px 13px 58px}
+.status{font-size:9px;display:flex;justify-content:space-between;border-bottom:1px solid #ddd;padding-bottom:8px;color:#555}
+.appbar{display:flex;justify-content:space-between;align-items:center;padding:14px 0 12px;border-bottom:1px solid #bbb}
+.appbar strong{font-size:16px}
+.avatar{width:24px;height:24px;border:1px solid #777;border-radius:50%;display:grid;place-items:center;font-size:9px}
+.date{font-size:10px;color:#555;margin:12px 0}
+.block{border:1px solid #999;padding:10px;margin:9px 0;background:#fff}
+.block.gray{background:#eee}
+.label{font-size:9px;color:#666;margin-bottom:7px;font-weight:bold;letter-spacing:.4px}
+.heading{font-size:12px;font-weight:bold;margin:3px 0 6px}
+.line{height:5px;background:#d5d5d5;margin:5px 0;width:100%}
+.line.short{width:55%}
+.line.mid{width:75%}
+.row{display:flex;gap:7px;align-items:center}
+.row>*{flex:1}
+.stat{border:1px solid #aaa;padding:9px;text-align:center;font-size:9px}
+.stat b{display:block;font-size:17px;margin-bottom:3px}
+.progress{height:8px;background:#e3e3e3;margin:8px 0}
+.progress i{display:block;height:8px;width:66%;background:#777}
+.task{display:flex;gap:7px;align-items:center;border-top:1px solid #ddd;padding:9px 0;font-size:9px}
+.check{width:12px;height:12px;border:1px solid #777;flex-shrink:0}
+.check.on{background:#777}
+.tasktext{flex:1}
+.tasktext b{display:block;font-size:10px;margin-bottom:3px}
+.tag{border:1px solid #aaa;padding:3px 5px;font-size:8px;white-space:nowrap}
+.button{border:1px solid #777;padding:8px;text-align:center;font-size:9px;background:#eee;margin-top:7px}
+.nav{position:absolute;bottom:0;left:0;right:0;height:43px;border-top:1px solid #aaa;display:flex;justify-content:space-around;align-items:center;background:#f3f3f3}
+.nav span{font-size:8px;text-align:center;color:#555}
+.nav b{display:block;font-size:13px;margin-bottom:3px}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin:10px 0}
+.calendar div{border:1px solid #bbb;text-align:center;padding:7px 0;font-size:8px;color:#555}
+.calendar .sel{background:#ccc;border-color:#555;font-weight:bold}
+.time{width:43px;font-size:9px;color:#555;flex-shrink:0}
+.note{font-size:9px;line-height:1.5;color:#666}
+.footer{padding:0 28px 24px;color:#666;font-size:10px}
+@media(max-width:700px){
+ header{padding:18px}
+ .board{padding:16px}
+ .frames{grid-template-columns:repeat(4,280px);min-width:0}
+ .screen{min-height:700px}
+ .footer{padding:0 18px 20px}
+}
+</style>
+</head>
+<body>
+
+<header>
+ <div class="meta">MOBILE APP · LOW-FIDELITY WIREFRAME</div>
+ <h1>AI 학업 플래너 — 화면 구조도</h1>
+ <p>v0.1 / 모바일 전용 / 4개 주요 화면 / 그레이톤 · 평면형 레이아웃</p>
+</header>
+
+<div class="board">
+<div class="frames">
+
+<!-- 01. 홈 화면 -->
+<section class="frame-wrap">
+ <div class="frame-title">01. 홈 <span>대시보드</span></div>
+ <div class="screen">
+  <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+  <div class="appbar"><strong>오늘의 학업</strong><div class="avatar">나</div></div>
+  <div class="date">2026년 11월 3일 화요일</div>
+
+  <div class="block">
+   <div class="label">TODAY · 학습 현황</div>
+   <div class="row">
+    <div class="stat"><b>2/3</b>완료한 학습</div>
+    <div>
+     <div class="heading">오늘도 잘하고 있어요!</div>
+     <div class="progress"><i></i></div>
+     <div class="note">오늘 계획한 학습을 확인하세요.</div>
+    </div>
+   </div>
+  </div>
+
+  <div class="block gray">
+   <div class="label">✦ AI STUDY ASSISTANT</div>
+   <div class="heading">오늘의 학습 계획 추천</div>
+   <div class="line"></div>
+   <div class="line mid"></div>
+   <div class="button">AI 추천 계획 보기</div>
+  </div>
+
+  <div class="block">
+   <div class="row">
+    <div class="heading">오늘 해야 할 일</div>
+    <div class="label" style="text-align:right">전체 3개</div>
+   </div>
+   <div class="task">
+    <span class="check on"></span>
+    <span class="tasktext"><b>자료구조 강의 복습</b>자료구조 · 10:00</span>
+    <span class="tag">완료</span>
+   </div>
+   <div class="task">
+    <span class="check on"></span>
+    <span class="tasktext"><b>영어 단어 암기</b>교양 영어 · 13:00</span>
+    <span class="tag">완료</span>
+   </div>
+   <div class="task">
+    <span class="check"></span>
+    <span class="tasktext"><b>팀 프로젝트 기획안</b>생성형 AI · 18:00</span>
+    <span class="tag">마감</span>
+   </div>
+  </div>
+
+  <div class="block">
+   <div class="label">QUICK MENU</div>
+   <div class="row">
+    <div class="stat">주간 시간표</div>
+    <div class="stat">과제 관리</div>
+   </div>
+  </div>
+
+  <div class="nav">
+   <span><b>⌂</b>홈</span>
+   <span><b>▦</b>일정</span>
+   <span><b>☷</b>과제</span>
+   <span><b>○</b>마이</span>
+  </div>
+ </div>
+</section>
+
+<!-- 02. 일정 화면 -->
+<section class="frame-wrap">
+ <div class="frame-title">02. 일정 <span>주간 시간표</span></div>
+ <div class="screen">
+  <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+  <div class="appbar"><strong>주간 일정</strong><div class="avatar">＋</div></div>
+  <div class="date">2026년 11월 1주차</div>
+
+  <div class="block">
+   <div class="label">WEEKLY CALENDAR</div>
+   <div class="calendar">
+    <div>월<br><b>2</b></div>
+    <div class="sel">화<br><b>3</b></div>
+    <div>수<br><b>4</b></div>
+    <div>목<br><b>5</b></div>
+    <div>금<br><b>6</b></div>
+    <div>토<br><b>7</b></div>
+    <div>일<br><b>8</b></div>
+   </div>
+  </div>
+
+  <div class="heading" style="margin:17px 0 10px">11월 3일 화요일</div>
+
+  <div class="block">
+   <div class="task">
+    <span class="time">09:00</span>
+    <span class="tasktext"><b>자료구조</b>전공 강의</span>
+    <span class="tag">완료</span>
+   </div>
+   <div class="task">
+    <span class="time">13:00</span>
+    <span class="tasktext"><b>교양 영어</b>어학 강의</span>
+    <span class="tag">완료</span>
+   </div>
+   <div class="task">
+    <span class="time">16:00</span>
+    <span class="tasktext"><b>개인 학습 시간</b>복습 및 과제</span>
+   </div>
+   <div class="task">
+    <span class="time">18:00</span>
+    <span class="tasktext"><b>팀 프로젝트 기획안</b>생성형 AI</span>
+    <span class="tag">마감</span>
+   </div>
+  </div>
+
+  <div class="block gray">
+   <div class="label">SCHEDULE NOTE</div>
+   <div class="note">선택한 날짜의 강의와 개인 학습 일정을 시간순으로 표시합니다.</div>
+  </div>
+
+  <div class="button">＋ 일정 추가</div>
+
+  <div class="nav">
+   <span><b>⌂</b>홈</span>
+   <span><b>▦</b>일정</span>
+   <span><b>☷</b>과제</span>
+   <span><b>○</b>마이</span>
+  </div>
+ </div>
+</section>
+
+<!-- 03. 과제 화면 -->
+<section class="frame-wrap">
+ <div class="frame-title">03. 과제 <span>과제 관리</span></div>
+ <div class="screen">
+  <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+  <div class="appbar"><strong>과제 관리</strong><div class="avatar">＋</div></div>
+  <div class="date">이번 학기 과제 및 제출 일정</div>
+
+  <div class="block">
+   <div class="row">
+    <div class="heading">다가오는 마감</div>
+    <div class="label" style="text-align:right">마감일순</div>
+   </div>
+   <div class="task">
+    <span class="tag">오늘</span>
+    <span class="tasktext"><b>AI 팀 프로젝트 기획안</b>생성형 AI · 미완료</span>
+   </div>
+   <div class="task">
+    <span class="tag">11.05</span>
+    <span class="tasktext"><b>자료구조 실습 과제</b>자료구조 · 진행 중</span>
+   </div>
+   <div class="task">
+    <span class="tag">11.09</span>
+    <span class="tasktext"><b>영어 에세이 제출</b>교양 영어 · 시작 전</span>
+   </div>
+  </div>
+
+  <div class="block gray">
+   <div class="label">✦ AI PRIORITY</div>
+   <div class="heading">과제 우선순위 분석</div>
+   <div class="line"></div>
+   <div class="line"></div>
+   <div class="line short"></div>
+   <div class="button">우선순위 확인</div>
+  </div>
+
+  <div class="block">
+   <div class="label">TASK STATUS</div>
+   <div class="row">
+    <div class="stat"><b>1</b>진행 중</div>
+    <div class="stat"><b>1</b>시작 전</div>
+    <div class="stat"><b>1</b>완료</div>
+   </div>
+  </div>
+
+  <div class="button">＋ 과제 추가</div>
+
+  <div class="nav">
+   <span><b>⌂</b>홈</span>
+   <span><b>▦</b>일정</span>
+   <span><b>☷</b>과제</span>
+   <span><b>○</b>마이</span>
+  </div>
+ </div>
+</section>
+
+<!-- 04. 마이페이지 -->
+<section class="frame-wrap">
+ <div class="frame-title">04. 마이페이지 <span>설정</span></div>
+ <div class="screen">
+  <div class="status"><span>9:41</span><span>●●●　▰</span></div>
+  <div class="appbar"><strong>마이페이지</strong><div class="avatar">나</div></div>
+
+  <div class="block">
+   <div class="label">MY PROFILE</div>
+   <div class="row">
+    <div class="avatar" style="width:42px;height:42px">나</div>
+    <div>
+     <div class="heading">대학생 사용자</div>
+     <div class="note">나의 학습 프로필</div>
+    </div>
+   </div>
+  </div>
+
+  <div class="heading" style="margin:18px 2px 9px">학업 관리</div>
+
+  <div class="block">
+   <div class="task">
+    <span class="tasktext"><b>학기 및 수강 과목</b>등록된 과목 관리</span>
+    <span>›</span>
+   </div>
+   <div class="task">
+    <span class="tasktext"><b>학습 목표 설정</b>주간 목표와 집중 시간</span>
+    <span>›</span>
+   </div>
+   <div class="task">
+    <span class="tasktext"><b>알림 설정</b>과제 마감 및 학습 알림</span>
+    <span>›</span>
+   </div>
+  </div>
+
+  <div class="heading" style="margin:18px 2px 9px">AI 플래너 설정</div>
+
+  <div class="block">
+   <div class="task">
+    <span class="tasktext"><b>AI 추천 방식</b>학습 계획 추천 설정</span>
+    <span>›</span>
+   </div>
+   <div class="task">
+    <span class="tasktext"><b>개인 학습 패턴</b>선호 학습 시간 관리</span>
+    <span>›</span>
+   </div>
+  </div>
+
+  <div class="block gray">
+   <div class="label">APP INFO</div>
+   <div class="note">AI 학업 플래너 · Wireframe v0.1</div>
+  </div>
+
+  <div class="nav">
+   <span><b>⌂</b>홈</span>
+   <span><b>▦</b>일정</span>
+   <span><b>☷</b>과제</span>
+   <span><b>○</b>마이</span>
+  </div>
+ </div>
+</section>
+
+</div>
+</div>
+
+<div class="footer">
+※ 본 문서는 기능과 정보 배치를 검토하기 위한 저충실도 와이어프레임입니다.
+실제 색상·이미지·세부 UI 스타일은 적용하지 않았습니다.
+</div>
+
+</body>
+</html>
+
