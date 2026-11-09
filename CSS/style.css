@@ -122,3 +122,20 @@ h3{font-size:14px;margin:0 0 9px;font-weight:800}
 footer{display:none}
 @media(min-width:501px){body{background:#eaf0f7}.app-shell{width:430px;max-width:100%;margin:0 auto;border-left:1px solid #e2e9f2;border-right:1px solid #e2e9f2}}
 @media(max-width:360px){.view{padding-left:14px;padding-right:14px}.appbar{padding:0 16px}.stat{padding:12px}}
+
+/* ===== v6: weekly load / availability ===== */
+.load{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end}
+.load-col{text-align:center;font-size:10px;color:#8190a3;font-weight:700}
+.load-col.past{opacity:.45}.load-col.today span{color:#173b70}
+.load-bar{position:relative;height:96px;background:#f3f6fa;border-radius:8px;overflow:hidden}
+.load-bar i{position:absolute;left:0;right:0;display:block}
+.load-bar .use{bottom:0;background:linear-gradient(180deg,#5c95d0,#204f87)}
+.load-bar .short{background:repeating-linear-gradient(45deg,#c33f4b,#c33f4b 4px,#d9606b 4px,#d9606b 8px)}
+.load-bar .cap{height:0;border-top:2px dashed #173b70;z-index:2}
+.load-col b{display:block;margin-top:5px;font-size:10px;color:#30445f}.load-col b.bad{color:#c33f4b}
+.load-col span{display:block;margin-top:2px}
+.load-msg{font-size:11px;line-height:1.6;color:#718096;margin:10px 0 0}.load-msg.bad{color:#c33f4b;font-weight:700}
+.pill.sample{background:#fff4d6;color:#8a6200;padding:2px 6px;font-size:9px;vertical-align:middle}
+.avail-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.avail{display:block;text-align:center;font-size:10px;font-weight:800;color:#334a68}
+.avail input{width:100%;margin-top:5px;padding:8px 2px;text-align:center;border:1px solid #dce5ef;border-radius:8px;font-size:12px}

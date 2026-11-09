@@ -19,6 +19,8 @@
       <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b></div>
     </div>
     <div class="card"><div class="card-title"><span>학습 진행 현황</span><span id="completionText" class="tiny">0 / 0 완료</span></div><div class="progress"><i id="completionBar" style="width:0%"></i></div></div>
+    <div class="notice" id="sampleNotice" hidden>예시 데이터가 포함되어 있습니다. 실제 일정이 아니며 설정에서 삭제할 수 있습니다.</div>
+    <div class="card" id="homeLoad"></div>
     <h2>오늘의 일정</h2><div class="card" id="todayTasks"></div>
     <h2>AI 우선순위 추천</h2><div class="card" id="homeRecommendation"></div>
     <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
@@ -27,6 +29,7 @@
   <section class="view" id="view-schedule">
     <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
     <div class="week" id="weekGrid"></div>
+    <div class="card" id="scheduleLoad"></div>
     <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
     <div class="notice" id="staleNotice" hidden>일정이 변경되었습니다. 기존 AI 분석 결과는 유지되며, 다시 분석 버튼을 눌러 갱신할 수 있습니다.</div>
   </section>
@@ -40,7 +43,9 @@
 
   <section class="view" id="view-settings">
     <h1>설정</h1><p class="sub">앱 정보와 저장된 데이터를 관리합니다.</p>
-    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>Prototype v5</span></div></div>
+    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>Prototype v6</span></div></div>
+    <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)을 입력하면 주간 부하와 우선순위 분석에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
+    <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 삭제합니다. 예시 일정에는 "예시" 표시가 붙습니다.</p><div class="row"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
     <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
     <div class="notice">로그인 없이 사용합니다. 데이터는 현재 브라우저의 localStorage에 저장됩니다. 다른 기기와 자동 동기화되지는 않습니다.</div>
   </section>
