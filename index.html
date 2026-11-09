@@ -21,6 +21,8 @@
     <div class="card"><div class="card-title"><span>학습 진행 현황</span><span id="completionText" class="tiny">0 / 0 완료</span></div><div class="progress"><i id="completionBar" style="width:0%"></i></div></div>
     <div class="notice" id="sampleNotice" hidden>예시 데이터가 포함되어 있습니다. 실제 일정이 아니며 설정에서 삭제할 수 있습니다.</div>
     <div class="card" id="homeLoad"></div>
+    <div id="homeAdvice"></div>
+    <h2>오늘 할 일</h2><div class="card" id="homeAlloc"></div>
     <h2>오늘의 일정</h2><div class="card" id="todayTasks"></div>
     <h2>AI 우선순위 추천</h2><div class="card" id="homeRecommendation"></div>
     <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
@@ -30,6 +32,7 @@
     <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
     <div class="week" id="weekGrid"></div>
     <div class="card" id="scheduleLoad"></div>
+    <div class="card" id="dayAvail"></div>
     <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
     <div class="notice" id="staleNotice" hidden>일정이 변경되었습니다. 기존 AI 분석 결과는 유지되며, 다시 분석 버튼을 눌러 갱신할 수 있습니다.</div>
   </section>
@@ -37,13 +40,15 @@
   <section class="view" id="view-analysis">
     <h1>AI 학업 분석</h1><p class="sub">마감일·중요도·예상 소요 시간을 기준으로 우선순위를 계산합니다.</p>
     <div id="analysisContent"></div>
+    <div id="aiComment"></div>
+    <button class="btn full" onclick="getAiComment()">AI 코멘트 받기</button>
     <button class="btn primary full" onclick="runAnalysis()">✦ 지금 분석하기 / 다시 분석하기</button>
     <p class="tiny" style="margin-top:9px">현재는 Mock 분석 모드입니다. 우선순위는 브라우저의 규칙 기반 계산으로 제공되며 실제 Gemini API는 연결되지 않았습니다.</p>
   </section>
 
   <section class="view" id="view-settings">
     <h1>설정</h1><p class="sub">앱 정보와 저장된 데이터를 관리합니다.</p>
-    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>Prototype v6</span></div></div>
+    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>프로토타입 v2</span></div></div>
     <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)을 입력하면 주간 부하와 우선순위 분석에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
     <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 삭제합니다. 예시 일정에는 "예시" 표시가 붙습니다.</p><div class="row"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
     <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
@@ -53,7 +58,7 @@
   <section class="view" id="view-form">
     <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
     <h1 id="formHeading">일정 등록</h1><p class="sub">직접 입력하거나 파일·URL에서 정보를 가져오는 흐름을 확인할 수 있습니다.</p>
-    <div class="tabs"><button class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button data-tab="file" onclick="switchTab('file')">파일 업로드</button><button data-tab="url" onclick="switchTab('url')">URL 입력</button></div>
+    <div class="tabs"><button class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button data-tab="paste" onclick="switchTab('paste')">공지 붙여넣기</button><button data-tab="file" onclick="switchTab('file')">파일 업로드</button><button data-tab="url" onclick="switchTab('url')">URL 입력</button></div>
     <div id="tab-direct">
       <div class="field"><label>일정명 *</label><input id="fTitle" placeholder="예: 자료구조 과제 제출"></div>
       <div class="field"><label>일정 종류 *</label><select id="fType"><option>과제</option><option>시험</option><option>발표</option><option>팀 프로젝트</option></select></div>
@@ -61,6 +66,12 @@
       <div class="field"><label>중요도</label><select id="fImportance"><option>높음</option><option selected>보통</option><option>낮음</option></select></div>
       <div class="field"><label>예상 소요 시간</label><select id="fEffort"><option value="30">30분</option><option value="60" selected>1시간</option><option value="120">2시간</option><option value="180">3시간</option><option value="300">5시간 이상</option></select></div>
       <div class="field"><label>진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
+    </div>
+    <div id="tab-paste" class="hidden">
+      <div class="field"><label>강의 공지 붙여넣기</label><textarea id="noticeInput" placeholder="예: [자료구조] 3주차 과제 안내&#10;11월 20일까지 LMS에 제출하세요. 예상 소요 시간 3시간"></textarea></div>
+      <div class="notice" id="noticeMode"></div>
+      <button class="btn full" onclick="extractNotice()">일정 추출하기</button>
+      <p class="tiny" style="margin-top:9px">추출 결과는 직접 입력 탭에 채워지며, 확인·수정한 뒤 저장해야 반영됩니다.</p>
     </div>
     <div id="tab-file" class="hidden">
       <div class="field"><label>안내문 파일 선택 (PNG, JPG, JPEG, PDF)</label><input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.pdf"></div>

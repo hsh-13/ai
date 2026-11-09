@@ -2,11 +2,15 @@ const STORAGE_KEY='aiStudyPlannerV3Tasks'; // v4 사용자 데이터와 호환 �
 const ANALYSIS_KEY='aiStudyPlannerV3Analysis'; // v4 분석 데이터와 호환 유지
 const AVAIL_KEY='aiStudyPlannerAvail'; // v6: 요일별 가용 시간(월~일, 시간 단위)
 const DEFAULT_AVAIL=[2,2,2,2,2,3,3];
-let tasks=loadTasks(), analysis=loadAnalysis(), avail=loadAvail(), currentView='home', selectedDate=isoDate(new Date()), weekOffset=0, editingId=null;
+const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시간 수정
+// v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
+const AI_ENDPOINT='';
+let tasks=loadTasks(), analysis=loadAnalysis(), avail=loadAvail(), ovr=loadOvr(), currentView='home', selectedDate=isoDate(new Date()), weekOffset=0, editingId=null;
 const $=id=>document.getElementById(id);
 function loadTasks(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){return []}}
 function loadAnalysis(){try{return JSON.parse(localStorage.getItem(ANALYSIS_KEY))}catch(e){return null}}
 function loadAvail(){try{const a=JSON.parse(localStorage.getItem(AVAIL_KEY));return Array.isArray(a)&&a.length===7?a.map(Number):DEFAULT_AVAIL.slice()}catch(e){return DEFAULT_AVAIL.slice()}}
+function loadOvr(){try{return JSON.parse(localStorage.getItem(OVR_KEY))||{}}catch(e){return {}}}
 function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks));$('settingsCount').textContent=tasks.length+'개'}
 function isoDate(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
 function dateObj(s){return new Date(s+'T12:00:00')}
@@ -21,7 +25,7 @@ function renderHome(){
  $('totalCount').textContent=tasks.length+'개';$('completionRate').textContent=rate+'%';$('completionText').textContent=`${done} / ${tasks.length} 완료`;$('completionBar').style.width=rate+'%';
  const todays=tasks.filter(t=>t.date===isoDate(new Date())).sort((a,b)=>a.title.localeCompare(b.title));
  $('todayTasks').innerHTML=todays.length?todays.map(taskRow).join(''):(tasks.length?'<div class="empty">오늘 등록된 일정이 없습니다.</div>':'<div class="empty">등록된 일정이 없습니다.<br>일정 관리에서 추가하거나 예시 데이터로 먼저 체험해 보세요.<br><button class="btn small" style="margin-top:10px" onclick="seedSample()">예시 데이터 넣기</button></div>');
- renderLoad('homeLoad',startOfWeek(new Date()));
+ renderLoad('homeLoad',startOfWeek(new Date()));renderAdvice();renderAlloc();
  $('sampleNotice').hidden=!tasks.some(t=>t.sample);
  const rec=analysis?.items?.[0];$('homeRecommendation').innerHTML=rec?`<div class="card-title"><span>오늘 먼저 할 일정</span><span class="pill">${rec.grade} · ${rec.score}점</span></div><b>${escapeHtml(rec.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(rec.reason)}</p>`:'<div class="empty">아직 분석 결과가 없습니다.<br>AI 분석 화면에서 분석을 실행해 보세요.</div>';
 }
@@ -32,7 +36,7 @@ function renderSchedule(){
  const names=['월','화','수','목','금','토','일'];$('weekGrid').innerHTML=names.map((n,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);const s=isoDate(d);return `<button class="day ${s===selectedDate?'selected':''} ${s===isoDate(new Date())?'today':''}" onclick="selectDate('${s}')">${n}<b>${d.getDate()}</b></button>`}).join('');
  $('selectedDateLabel').textContent=fmt(selectedDate)+' 일정';
  const list=tasks.filter(t=>t.date===selectedDate).sort((a,b)=>a.title.localeCompare(b.title));
- renderLoad('scheduleLoad',base);
+ renderLoad('scheduleLoad',base);renderDayAvail();
  $('selectedTasks').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">선택한 날짜에 일정이 없습니다.</div>';markStale();
 }
 function selectDate(s){selectedDate=s;weekOffset=0;renderSchedule()}
@@ -48,7 +52,7 @@ function changeStatus(id,status){const t=tasks.find(x=>x.id===id);if(t){t.status
 function editTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;editingId=id;$('formHeading').textContent='일정 수정';$('fTitle').value=t.title;$('fType').value=t.type;$('fDate').value=t.date;$('fImportance').value=t.importance;$('fEffort').value=t.effort;$('fStatus').value=t.status;switchTab('direct');navigate('form')}
 function deleteTask(id){if(!confirm('이 일정을 삭제할까요?'))return;tasks=tasks.filter(t=>t.id!==id);persist();markStale();navigate('schedule');toast('일정이 삭제되었습니다.')}
 function clearForm(){['fTitle','fDate'].forEach(id=>$(id).value='');$('fType').value='과제';$('fImportance').value='보통';$('fEffort').value='60';$('fStatus').value='시작 전';}
-function switchTab(tab){['direct','file','url'].forEach(x=>{$('tab-'+x).classList.toggle('hidden',x!==tab);document.querySelector(`[data-tab="${x}"]`).classList.toggle('active',x===tab)})}
+function switchTab(tab){['direct','paste','file','url'].forEach(x=>{$('tab-'+x).classList.toggle('hidden',x!==tab);document.querySelector(`[data-tab="${x}"]`).classList.toggle('active',x===tab)})}
 function fillSample(){if($('fileInput').files.length===0&&document.querySelector('[data-tab="file"]').classList.contains('active')){toast('먼저 파일을 선택해 주세요.');return} $('fTitle').value='자료구조 과제 제출';$('fType').value='과제';$('fDate').value=isoDate(new Date());$('fImportance').value='보통';$('fEffort').value='120';$('fStatus').value='시작 전';switchTab('direct');toast('예시 추출값을 입력했습니다. 내용을 확인하고 수정하세요.')}
 function saveTask(){
  const title=$('fTitle').value.trim(),date=$('fDate').value;if(!title||!date){toast('일정명과 마감 날짜를 입력해 주세요.');return}
@@ -69,24 +73,24 @@ function renderAnalysis(){
  $('analysisContent').innerHTML=`<div class="card"><div class="card-title"><span>오늘 가장 먼저 할 일정</span><span class="pill">${first.grade} · ${first.score}점</span></div><b>${escapeHtml(first.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(first.reason)}</p><p class="sub" style="margin:5px 0 0">행동 추천: ${escapeHtml(first.action)}</p></div><h2>일정별 우선순위</h2>${analysis.items.map(x=>`<div class="card"><div class="card-title"><span>${escapeHtml(x.title)}</span><span class="pill">${x.grade} · ${x.score}점</span></div><div class="scorebar"><i style="width:${x.score}%"></i></div><p class="sub"><b>분석 이유</b><br>${escapeHtml(x.reason)}</p><p class="sub"><b>행동 추천</b><br>${escapeHtml(x.action)}</p></div>`).join('')}<p class="tiny">마지막 분석: ${new Date(analysis.createdAt).toLocaleString('ko-KR')}</p>`;
 }
 function showResetModal(){$('resetModal').classList.add('show')}function hideResetModal(){$('resetModal').classList.remove('show')}
-function confirmReset(){tasks=[];analysis=null;avail=DEFAULT_AVAIL.slice();localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(ANALYSIS_KEY);localStorage.removeItem(AVAIL_KEY);hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
+function confirmReset(){tasks=[];analysis=null;avail=DEFAULT_AVAIL.slice();ovr={};localStorage.removeItem(OVR_KEY);localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(ANALYSIS_KEY);localStorage.removeItem(AVAIL_KEY);hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
 
 /* ===== v6: 가용 시간 · 주간 부하 · 예시 데이터 ===== */
 const DAY_NAMES=['월','화','수','목','금','토','일'];
 function fh(h){return (Math.round(h*10)/10)+'시간'}
-function availOn(d){return Number(avail[(d.getDay()+6)%7])||0}
+function availOn(d){const k=isoDate(d);if(ovr[k]!==undefined)return Number(ovr[k])||0;return Number(avail[(d.getDay()+6)%7])||0}
 // 마감 임박 순으로, 각 일정의 소요 시간을 마감일부터 거꾸로 가용 시간에 채워 넣는다(날짜 계산은 코드가 담당).
 function buildPlan(){
- const today=dateObj(isoDate(new Date())),used={},short={},taskShort={};
+ const today=dateObj(isoDate(new Date())),used={},short={},taskShort={},alloc={};
  tasks.filter(t=>t.status!=='완료').sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
   let rem=t.effort/60,dl=dateObj(t.date);if(dl<today)dl=new Date(today);
   for(const d=new Date(dl);d>=today&&rem>0;d.setDate(d.getDate()-1)){
    const k=isoDate(d),take=Math.min(Math.max(0,availOn(d)-(used[k]||0)),rem);
-   if(take>0){used[k]=(used[k]||0)+take;rem-=take}
+   if(take>0){used[k]=(used[k]||0)+take;rem-=take;(alloc[k]=alloc[k]||[]).push({id:t.id,title:t.title,h:take})}
   }
   if(rem>0.001){const k=isoDate(dl);short[k]=(short[k]||0)+rem;taskShort[t.id]=rem}
  });
- return {used,short,taskShort};
+ return {used,short,taskShort,alloc};
 }
 function renderLoad(elId,base){
  const el=$(elId);if(!el)return;
@@ -111,5 +115,80 @@ function seedSample(){
  persist();markStale();navigate(currentView==='settings'?'settings':'home');toast('예시 데이터 5건을 넣었습니다.');
 }
 function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();markStale();analysis=null;localStorage.removeItem(ANALYSIS_KEY);navigate(currentView);toast('예시 데이터를 삭제했습니다.')}
-function init(){persist();renderAvail();renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
+
+/* ===== v7: 오늘 할 일 · 조정 제안 · 날짜별 가용 시간 · 공지 붙여넣기 · AI 연결 지점 ===== */
+function renderAlloc(){
+ const el=$('homeAlloc');if(!el)return;
+ const plan=buildPlan(),items=plan.alloc[isoDate(new Date())]||[];
+ el.innerHTML=items.length?items.map(x=>`<div class="task"><div class="task-name">${escapeHtml(x.title)}</div><span class="pill">${fh(x.h)}</span></div>`).join('')+`<p class="tiny" style="margin:8px 0 0">마감일부터 거꾸로 가용 시간에 배정한 오늘 몫입니다.</p>`:'<div class="empty">오늘 배정된 작업이 없습니다.</div>';
+}
+function buildAdvice(plan){
+ const today=dateObj(isoDate(new Date()));
+ return tasks.filter(t=>plan.taskShort[t.id]).map(t=>{
+  let dl=dateObj(t.date);if(dl<today)dl=today;
+  const days=Math.round((dl-today)/86400000)+1,sh=plan.taskShort[t.id];
+  return {title:t.title,short:sh,days,perDay:sh/days};
+ });
+}
+function renderAdvice(){
+ const el=$('homeAdvice');if(!el)return;
+ const list=buildAdvice(buildPlan());
+ el.innerHTML=list.length?`<div class="card advice"><div class="card-title"><span>조정이 필요한 일정</span></div>${list.map(a=>`<p><b>${escapeHtml(a.title)}</b><br>마감 전까지 ${fh(a.short)}이 부족합니다. 마감까지 ${a.days}일 동안 하루 ${fh(a.perDay)}씩 더 확보하거나, 소요 시간을 줄이거나, 다른 일정을 미뤄야 합니다.</p>`).join('')}</div>`:'';
+}
+function renderDayAvail(){
+ const el=$('dayAvail');if(!el)return;
+ const d=dateObj(selectedDate),has=ovr[selectedDate]!==undefined;
+ el.innerHTML=`<div class="card-title"><span>${fmt(selectedDate)} 가용 시간</span><span class="tiny">${has?'이 날만 수정됨':'요일 기본값 사용'}</span></div><div class="row"><input class="num" type="number" min="0" max="16" step="0.5" value="${availOn(d)}" onchange="setOvr('${selectedDate}',this.value)"><button class="btn small" onclick="setOvr('${selectedDate}','')">기본값으로</button></div><p class="tiny" style="margin:8px 0 0">알바·약속 등으로 이 날만 시간이 다르면 여기서 바꾸세요. 부하 막대에 바로 반영됩니다.</p>`;
+}
+function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}localStorage.setItem(OVR_KEY,JSON.stringify(ovr));markStale();renderSchedule();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
+
+// ---- AI 연결 지점: 엔드포인트가 있으면 중계 서버로, 없으면 규칙 기반 Mock으로 처리 ----
+async function aiCall(task,payload){
+ if(!AI_ENDPOINT)return null;
+ const r=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,...payload})});
+ if(!r.ok)throw new Error('AI 응답 오류 '+r.status);
+ return r.json();
+}
+const TYPES=['과제','시험','발표','팀 프로젝트'],IMPS=['높음','보통','낮음'],EFFORTS=[30,60,120,180,300];
+function nearestEffort(m){return EFFORTS.reduce((a,b)=>Math.abs(b-m)<Math.abs(a-m)?b:a)}
+function validExtract(o){return o&&typeof o.title==='string'&&o.title.trim()&&TYPES.includes(o.type)&&/^\d{4}-\d{2}-\d{2}$/.test(o.date||'')&&IMPS.includes(o.importance)&&EFFORTS.includes(Number(o.effort))}
+function parseDate(text){
+ const now=new Date(),today=dateObj(isoDate(now));let m,d=null;
+ if(m=text.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/))d=new Date(+m[1],+m[2]-1,+m[3],12);
+ else if(m=text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/))d=new Date(now.getFullYear(),+m[1]-1,+m[2],12);
+ else if(m=text.match(/(\d{1,2})\/(\d{1,2})/))d=new Date(now.getFullYear(),+m[1]-1,+m[2],12);
+ else if(/모레/.test(text)){d=new Date(today);d.setDate(d.getDate()+2)}
+ else if(/내일/.test(text)){d=new Date(today);d.setDate(d.getDate()+1)}
+ else if(/오늘/.test(text))d=new Date(today);
+ else if(m=text.match(/(이번|다음)\s*주\s*([월화수목금토일])요일/)){const idx='월화수목금토일'.indexOf(m[2]);d=new Date(startOfWeek(today));d.setDate(d.getDate()+idx+(m[1]==='다음'?7:0))}
+ if(d&&d<today&&!/(\d{4})/.test(text)&&!/이번|다음/.test(text))d.setFullYear(d.getFullYear()+1);
+ return d?isoDate(d):'';
+}
+function mockExtract(text){
+ const line=(text.split(/\n/).map(x=>x.trim()).find(Boolean)||'').replace(/^[\[\(【](.*?)[\]\)】]\s*/,'$1 ');
+ const type=/팀\s*프로젝트|팀플/.test(text)?'팀 프로젝트':/시험|중간고사|기말|퀴즈/.test(text)?'시험':/발표|PT|프레젠/i.test(text)?'발표':'과제';
+ const h=text.match(/(\d+(?:\.\d+)?)\s*시간/),effort=h?nearestEffort(parseFloat(h[1])*60):{시험:180,발표:120,'팀 프로젝트':300,과제:120}[type];
+ const importance=/중간고사|기말|필수|성적/.test(text)?'높음':'보통';
+ return {title:line.slice(0,40),type,date:parseDate(text),importance,effort};
+}
+async function extractNotice(){
+ const text=$('noticeInput').value.trim();if(!text){toast('공지 내용을 붙여넣어 주세요.');return}
+ let r=null,mode='규칙 기반(Mock)';
+ try{const x=await aiCall('extract',{text,today:isoDate(new Date())});if(validExtract(x)){r=x;mode='AI'}}catch(e){toast('AI 연결에 실패해 규칙 기반으로 추출했습니다.')}
+ if(!r)r=mockExtract(text);
+ $('fTitle').value=r.title;$('fType').value=r.type;$('fDate').value=r.date;$('fImportance').value=r.importance;$('fEffort').value=String(r.effort);$('fStatus').value='시작 전';
+ switchTab('direct');
+ toast(r.date?`${mode}으로 추출했습니다. 내용을 확인하고 수정하세요.`:'날짜를 찾지 못했습니다. 마감 날짜를 직접 입력해 주세요.');
+}
+async function getAiComment(){
+ const plan=buildPlan(),today=plan.alloc[isoDate(new Date())]||[],adv=buildAdvice(plan);
+ let text=null,mode='규칙 기반(Mock)';
+ try{const x=await aiCall('comment',{today:today.map(a=>({title:a.title,hours:a.h})),shortages:adv.map(a=>({title:a.title,shortHours:a.short,days:a.days}))});if(x&&typeof x.comment==='string'&&x.comment.trim()){text=x.comment.trim();mode='AI'}}catch(e){toast('AI 연결에 실패해 기본 문장을 보여줍니다.')}
+ if(!text){
+  text=today.length?`오늘은 ${today.map(a=>`${a.title} ${fh(a.h)}`).join(', ')} 순서로 진행하세요.`:'오늘 배정된 작업이 없습니다.';
+  if(adv.length)text+=` 다만 ${adv.map(a=>a.title).join(', ')}은(는) 가용 시간이 부족하니 일정이나 가용 시간을 조정해 보세요.`;
+ }
+ $('aiComment').innerHTML=`<div class="card"><div class="card-title"><span>AI 코멘트</span><span class="pill">${mode}</span></div><p class="sub" style="margin:0">${escapeHtml(text)}</p></div>`;
+}
+function init(){persist();renderAvail();$('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다.':'현재는 규칙 기반 Mock으로 추출합니다(AI 서버 미연결).';renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
 init();

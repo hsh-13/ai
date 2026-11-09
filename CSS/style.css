@@ -139,3 +139,9 @@ footer{display:none}
 .avail-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
 .avail{display:block;text-align:center;font-size:10px;font-weight:800;color:#334a68}
 .avail input{width:100%;margin-top:5px;padding:8px 2px;text-align:center;border:1px solid #dce5ef;border-radius:8px;font-size:12px}
+
+/* ===== v7 ===== */
+.advice p{font-size:12px;line-height:1.65;color:#8a2f3a;margin:0 0 10px}.advice p:last-child{margin:0}
+.advice{border-color:#f0d5d8;background:#fffafb}
+.num{width:100%;padding:10px;border:1px solid #dce5ef;border-radius:10px;font-size:12px}
+#noticeInput{min-height:120px}

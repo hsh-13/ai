@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI 학업 플래너</title>
+<style>
+:root{--bg:#f3f4f6;--paper:#fff;--ink:#252a30;--muted:#737b84;--line:#dfe3e7;--dark:#343a40;--soft:#eceff1;--blue:#eaf1ff;--blueink:#315b9b;--red:#a33b3b;--green:#eaf4ed}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,"Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+button,input,select,textarea{font:inherit}button{cursor:pointer}
+header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 max(16px,calc((100vw - 1180px)/2));position:sticky;top:0;z-index:20}
+.brand{font-weight:800;font-size:16px}.brand small{font-size:11px;color:var(--muted);font-weight:500;margin-left:8px}.header-right{font-size:11px;color:var(--muted)}
+main{width:100%;max-width:none;margin:0;padding:0}
+.app-shell{width:100%;max-width:none;margin:0;background:var(--bg);border:0;border-radius:0;overflow:hidden;min-height:100dvh;box-shadow:none;display:flex;flex-direction:column}
+.appbar{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 17px;flex:none}
+.appbar strong{font-size:15px}.appbar span{font-size:10px;color:var(--muted)}
+.view{display:none;padding:17px 16px 22px;flex:1;min-height:calc(100dvh - 120px)}.view.active{display:block}
+h1{font-size:20px;margin:0 0 5px}h2{font-size:15px;margin:20px 0 10px}h3{font-size:13px;margin:0 0 8px}
+.sub{font-size:11px;color:var(--muted);line-height:1.55;margin:0 0 15px}
+.card{background:#fff;border:1px solid var(--line);border-radius:11px;padding:13px;margin:9px 0}
+.card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;margin-bottom:8px}
+.muted{color:var(--muted)}.tiny{font-size:10px;color:var(--muted)}
+.btn{border:1px solid #cbd1d7;background:#fff;color:var(--ink);padding:10px 12px;border-radius:8px;font-size:11px;font-weight:600}
+.btn.primary{background:var(--dark);color:#fff;border-color:var(--dark)}.btn.danger{color:var(--red);border-color:#e5caca}.btn.small{padding:7px 9px;font-size:10px}.btn.full{width:100%;margin-top:8px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center}.row>*{flex:1;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}.stat b{display:block;font-size:21px;margin-top:5px}
+.progress{height:7px;background:#e7e9ec;border-radius:20px;overflow:hidden;margin:8px 0}.progress i{display:block;height:100%;background:#555e67;border-radius:20px}
+.pill{display:inline-block;background:var(--soft);border-radius:20px;padding:4px 7px;font-size:9px;color:#525b64}
+.task{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid #edf0f2}.task:last-child{border:0}.task-name{font-size:11px;font-weight:700}.task-meta{font-size:10px;color:var(--muted);margin-top:4px}
+.task-actions{display:flex;gap:5px;align-items:center}.task-actions button{border:0;background:#f0f2f4;border-radius:6px;padding:6px;font-size:10px}
+.nav{height:62px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:5px 6px;flex:none}
+.nav button{border:0;background:transparent;color:#818890;border-radius:8px;font-size:9px}.nav button b{display:block;font-size:17px;margin-bottom:3px}.nav button.active{background:#eff1f3;color:#252a30;font-weight:700}
+.field{margin:11px 0}.field label{display:block;font-size:10px;font-weight:700;margin-bottom:6px}.field input,.field select,.field textarea{width:100%;border:1px solid #d6dbe0;background:#fff;border-radius:8px;padding:10px;font-size:11px;color:var(--ink)}.field textarea{min-height:70px;resize:vertical}
+.tabs{display:flex;gap:5px;margin:12px 0}.tabs button{flex:1;padding:9px 4px;border:1px solid var(--line);background:#fff;border-radius:7px;font-size:10px}.tabs button.active{background:var(--dark);color:#fff;border-color:var(--dark)}
+.week-head{display:flex;align-items:center;justify-content:space-between}.week{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin:12px 0}.day{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 0;text-align:center;font-size:9px;color:var(--muted)}.day b{display:block;color:var(--ink);font-size:11px;margin-top:4px}.day.selected{background:var(--dark);color:#fff;border-color:var(--dark)}.day.selected b{color:#fff}.day.today:not(.selected){border-color:#6c7782}
+.empty{padding:20px 10px;text-align:center;color:var(--muted);font-size:11px;line-height:1.6}
+.priority-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-size:10px;margin:10px 0}.scorebar{height:6px;background:#eceff1;border-radius:10px;margin-top:5px;overflow:hidden}.scorebar i{display:block;height:100%;background:#59616a}
+.notice{background:var(--blue);border:1px solid #d4e1fa;color:var(--blueink);padding:9px;border-radius:8px;font-size:10px;line-height:1.5;margin:10px 0}
+.fab{position:sticky;float:right;bottom:8px;border:0;background:var(--dark);color:#fff;width:43px;height:43px;border-radius:50%;font-size:23px;box-shadow:0 3px 10px #0002}
+.back{border:0;background:transparent;padding:0;color:var(--muted);font-size:11px;margin-bottom:13px}
+.hidden{display:none!important}
+.modal-backdrop{position:fixed;inset:0;background:#11182077;display:none;align-items:center;justify-content:center;padding:18px;z-index:40}.modal-backdrop.show{display:flex}.modal{width:min(100%,360px);background:#fff;border-radius:14px;padding:18px;box-shadow:0 15px 40px #0003}.modal h3{font-size:15px}.modal p{font-size:11px;color:var(--muted);line-height:1.6}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#252a30;color:white;padding:11px 15px;border-radius:8px;font-size:11px;z-index:60;opacity:0;transition:.2s;pointer-events:none;max-width:90%;text-align:center}.toast.show{opacity:1}
+footer{max-width:430px;margin:13px auto 0;color:#69727b;font-size:10px;line-height:1.6}
+@media(min-width:501px){.app-shell{width:390px;max-width:100%;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line)}body{background:#e9ecef}}
+
+/* ===== v5 visual system: navy productivity app ===== */
+:root{
+ --bg:#f4f7fb;--paper:#ffffff;--ink:#17243b;--muted:#718096;--line:#e4eaf2;
+ --dark:#173b70;--soft:#edf3fb;--blue:#eaf2ff;--blueink:#244f89;
+ --red:#c33f4b;--green:#e8f6ee;--navy:#173b70;--navy2:#245a9c;
+ --shadow:0 5px 18px rgba(22,49,85,.055)
+}
+*{box-sizing:border-box}
+body{margin:0;background:#eaf0f7;color:var(--ink);font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Noto Sans KR","Apple SD Gothic Neo",Arial,sans-serif;letter-spacing:-.2px}
+button,input,select,textarea{font:inherit}
+header{display:none}
+main{width:100%;max-width:none;margin:0}
+.app-shell{width:100%;max-width:430px;margin:0 auto;background:var(--bg);border:0;min-height:100dvh;box-shadow:0 12px 42px rgba(19,47,82,.08);display:flex;flex-direction:column;overflow:hidden}
+.appbar{height:62px;background:rgba(255,255,255,.96);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 20px;flex:none;position:sticky;top:0;z-index:15;backdrop-filter:blur(12px)}
+.appbar strong{font-size:16px;font-weight:800;letter-spacing:-.55px;color:#173b70}
+.appbar strong:before{content:"";display:inline-block;width:8px;height:8px;border-radius:3px;background:#3478c8;margin:0 9px 1px 0;box-shadow:0 0 0 4px #eaf2ff}
+.view{display:none;padding:22px 18px 28px;flex:1;min-height:calc(100dvh - 124px)}
+.view.active{display:block}
+h1{font-size:22px;line-height:1.3;letter-spacing:-.8px;margin:0 0 6px;font-weight:800;color:#172b49}
+h2{font-size:15px;letter-spacing:-.4px;margin:23px 0 11px;font-weight:800;color:#203653}
+h3{font-size:14px;margin:0 0 9px;font-weight:800}
+.sub{font-size:12px;color:var(--muted);line-height:1.65;margin:0 0 17px}
+.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:15px;margin:10px 0;box-shadow:var(--shadow)}
+.card-title{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;font-weight:800;margin-bottom:10px;color:#29405f}
+.muted{color:var(--muted)}.tiny{font-size:10px;color:var(--muted);line-height:1.5}
+.btn{border:1px solid #d7e1ed;background:#fff;color:#29405f;padding:11px 14px;border-radius:10px;font-size:12px;font-weight:700;transition:transform .15s,background .15s}
+.btn:active{transform:scale(.98)}
+.btn.primary{background:linear-gradient(135deg,#214f89,#173b70);color:#fff;border-color:#173b70;box-shadow:0 5px 12px rgba(23,59,112,.16)}
+.btn.danger{color:var(--red);border-color:#f0d5d8;background:#fffafb}
+.btn.small{padding:8px 11px;font-size:11px;border-radius:9px}
+.btn.full{width:100%;margin-top:9px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:9px;align-items:center}.row>*{flex:1;min-width:0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:linear-gradient(145deg,#fff,#f8fbff);border:1px solid #e2eaf4;border-radius:15px;padding:15px;box-shadow:var(--shadow)}
+.stat .tiny{font-weight:700;color:#71829a}
+.stat b{display:block;font-size:25px;margin-top:7px;color:#183f73;letter-spacing:-1px}
+.progress{height:8px;background:#edf1f6;border-radius:20px;overflow:hidden;margin:10px 0 2px}
+.progress i{display:block;height:100%;background:linear-gradient(90deg,#4c8bd0,#1c4c83);border-radius:20px;transition:width .25s}
+.pill{display:inline-block;background:#edf3fb;border-radius:20px;padding:5px 9px;font-size:10px;color:#315b8e;font-weight:800}
+.task{display:flex;align-items:center;justify-content:space-between;gap:9px;padding:12px 0;border-bottom:1px solid #eef2f7}
+.task:last-child{border:0}
+.task-name{font-size:12px;font-weight:800;color:#203653}
+.task-meta{font-size:10px;color:#7a899d;margin-top:5px;line-height:1.5}
+.task-actions{display:flex;gap:5px;align-items:center}
+.task-actions button{border:1px solid #e3eaf2;background:#f6f9fc;color:#31557f;border-radius:8px;padding:7px 9px;font-size:10px;font-weight:700}
+.nav{height:70px;background:rgba(255,255,255,.98);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding:7px 8px max(7px,env(safe-area-inset-bottom));flex:none;position:sticky;bottom:0;z-index:20;backdrop-filter:blur(12px)}
+.nav button{border:0;background:transparent;color:#8b98aa;border-radius:11px;font-size:10px;font-weight:700;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.nav button b{display:flex;align-items:center;justify-content:center;font-size:0;width:24px;height:23px;margin:0}
+.nav button b svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.nav button.active{background:#edf4fd;color:#1d4f88}
+.field{margin:14px 0}
+.field label{display:block;font-size:11px;font-weight:800;margin-bottom:7px;color:#334a68}
+.field input,.field select,.field textarea{width:100%;border:1px solid #dce5ef;background:#fff;border-radius:10px;padding:12px;font-size:12px;color:var(--ink);outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:#5d8fc6;box-shadow:0 0 0 3px #eaf2ff}
+.field textarea{min-height:80px;resize:vertical}
+.tabs{display:flex;gap:6px;margin:14px 0}
+.tabs button{flex:1;padding:10px 5px;border:1px solid #e0e8f1;background:#fff;border-radius:9px;font-size:11px;font-weight:700;color:#65758b}
+.tabs button.active{background:#173b70;color:#fff;border-color:#173b70}
+.week-head{display:flex;align-items:center;justify-content:space-between}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:15px 0}
+.day{background:#fff;border:1px solid #e1e8f1;border-radius:11px;padding:9px 0;text-align:center;font-size:10px;color:#8190a3;font-weight:700}
+.day b{display:block;color:#30445f;font-size:13px;margin-top:5px}
+.day.selected{background:#173b70;color:#dceaff;border-color:#173b70;box-shadow:0 4px 10px #173b7025}
+.day.selected b{color:#fff}
+.day.today:not(.selected){border-color:#4d83bd;color:#315f96}
+.empty{padding:24px 10px;text-align:center;color:#8290a3;font-size:11px;line-height:1.7}
+.priority-row{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;font-size:11px;margin:12px 0}
+.scorebar{height:7px;background:#edf1f6;border-radius:10px;margin-top:7px;overflow:hidden}
+.scorebar i{display:block;height:100%;background:linear-gradient(90deg,#5c95d0,#204f87);border-radius:10px}
+.notice{background:#edf5ff;border:1px solid #d9e8fa;color:#315b8e;padding:11px 12px;border-radius:11px;font-size:11px;line-height:1.6;margin:12px 0}
+.fab{position:sticky;float:right;bottom:8px;border:0;background:#173b70;color:#fff;width:46px;height:46px;border-radius:15px;font-size:24px;box-shadow:0 5px 14px #173b7030}
+.back{border:0;background:transparent;padding:0;color:#6e8097;font-size:12px;font-weight:700;margin-bottom:16px}
+.hidden{display:none!important}
+.modal-backdrop{position:fixed;inset:0;background:#12233b88;display:none;align-items:center;justify-content:center;padding:18px;z-index:40}
+.modal-backdrop.show{display:flex}
+.modal{width:min(100%,360px);background:#fff;border-radius:18px;padding:20px;box-shadow:0 15px 40px #0003}
+.modal h3{font-size:16px}.modal p{font-size:12px;color:var(--muted);line-height:1.65}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:#183653;color:white;padding:12px 16px;border-radius:11px;font-size:11px;z-index:60;opacity:0;transition:.2s;pointer-events:none;max-width:90%;text-align:center;box-shadow:0 5px 18px #142e4d30}
+.toast.show{opacity:1}
+footer{display:none}
+@media(min-width:501px){body{background:#eaf0f7}.app-shell{width:430px;max-width:100%;margin:0 auto;border-left:1px solid #e2e9f2;border-right:1px solid #e2e9f2}}
+@media(max-width:360px){.view{padding-left:14px;padding-right:14px}.appbar{padding:0 16px}.stat{padding:12px}}
+
+/* ===== v6: weekly load / availability ===== */
+.load{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;align-items:end}
+.load-col{text-align:center;font-size:10px;color:#8190a3;font-weight:700}
+.load-col.past{opacity:.45}.load-col.today span{color:#173b70}
+.load-bar{position:relative;height:96px;background:#f3f6fa;border-radius:8px;overflow:hidden}
+.load-bar i{position:absolute;left:0;right:0;display:block}
+.load-bar .use{bottom:0;background:linear-gradient(180deg,#5c95d0,#204f87)}
+.load-bar .short{background:repeating-linear-gradient(45deg,#c33f4b,#c33f4b 4px,#d9606b 4px,#d9606b 8px)}
+.load-bar .cap{height:0;border-top:2px dashed #173b70;z-index:2}
+.load-col b{display:block;margin-top:5px;font-size:10px;color:#30445f}.load-col b.bad{color:#c33f4b}
+.load-col span{display:block;margin-top:2px}
+.load-msg{font-size:11px;line-height:1.6;color:#718096;margin:10px 0 0}.load-msg.bad{color:#c33f4b;font-weight:700}
+.pill.sample{background:#fff4d6;color:#8a6200;padding:2px 6px;font-size:9px;vertical-align:middle}
+.avail-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.avail{display:block;text-align:center;font-size:10px;font-weight:800;color:#334a68}
+.avail input{width:100%;margin-top:5px;padding:8px 2px;text-align:center;border:1px solid #dce5ef;border-radius:8px;font-size:12px}
+
+/* ===== v7 ===== */
+.advice p{font-size:12px;line-height:1.65;color:#8a2f3a;margin:0 0 10px}.advice p:last-child{margin:0}
+.advice{border-color:#f0d5d8;background:#fffafb}
+.num{width:100%;padding:10px;border:1px solid #dce5ef;border-radius:10px;font-size:12px}
+#noticeInput{min-height:120px}
+
+</style>
+</head>
+<body>
+
+<main>
+<div class="app-shell">
+  <div class="appbar"><strong id="appTitle">AI 학업 플래너</strong></div>
+
+  <section class="view active" id="view-home">
+    <h1>오늘의 학업 현황</h1><p class="sub" id="todayLabel">오늘 해야 할 일을 확인하세요.</p>
+    <div class="grid2">
+      <div class="stat"><span class="tiny">전체 일정</span><b id="totalCount">0개</b></div>
+      <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b></div>
+    </div>
+    <div class="card"><div class="card-title"><span>학습 진행 현황</span><span id="completionText" class="tiny">0 / 0 완료</span></div><div class="progress"><i id="completionBar" style="width:0%"></i></div></div>
+    <div class="notice" id="sampleNotice" hidden>예시 데이터가 포함되어 있습니다. 실제 일정이 아니며 설정에서 삭제할 수 있습니다.</div>
+    <div class="card" id="homeLoad"></div>
+    <div id="homeAdvice"></div>
+    <h2>오늘 할 일</h2><div class="card" id="homeAlloc"></div>
+    <h2>오늘의 일정</h2><div class="card" id="todayTasks"></div>
+    <h2>AI 우선순위 추천</h2><div class="card" id="homeRecommendation"></div>
+    <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
+  </section>
+
+  <section class="view" id="view-schedule">
+    <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
+    <div class="week" id="weekGrid"></div>
+    <div class="card" id="scheduleLoad"></div>
+    <div class="card" id="dayAvail"></div>
+    <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
+    <div class="notice" id="staleNotice" hidden>일정이 변경되었습니다. 기존 AI 분석 결과는 유지되며, 다시 분석 버튼을 눌러 갱신할 수 있습니다.</div>
+  </section>
+
+  <section class="view" id="view-analysis">
+    <h1>AI 학업 분석</h1><p class="sub">마감일·중요도·예상 소요 시간을 기준으로 우선순위를 계산합니다.</p>
+    <div id="analysisContent"></div>
+    <div id="aiComment"></div>
+    <button class="btn full" onclick="getAiComment()">AI 코멘트 받기</button>
+    <button class="btn primary full" onclick="runAnalysis()">✦ 지금 분석하기 / 다시 분석하기</button>
+    <p class="tiny" style="margin-top:9px">현재는 Mock 분석 모드입니다. 우선순위는 브라우저의 규칙 기반 계산으로 제공되며 실제 Gemini API는 연결되지 않았습니다.</p>
+  </section>
+
+  <section class="view" id="view-settings">
+    <h1>설정</h1><p class="sub">앱 정보와 저장된 데이터를 관리합니다.</p>
+    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>프로토타입 v2</span></div></div>
+    <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)을 입력하면 주간 부하와 우선순위 분석에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
+    <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 삭제합니다. 예시 일정에는 "예시" 표시가 붙습니다.</p><div class="row"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
+    <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
+    <div class="notice">로그인 없이 사용합니다. 데이터는 현재 브라우저의 localStorage에 저장됩니다. 다른 기기와 자동 동기화되지는 않습니다.</div>
+  </section>
+
+  <section class="view" id="view-form">
+    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+    <h1 id="formHeading">일정 등록</h1><p class="sub">직접 입력하거나 파일·URL에서 정보를 가져오는 흐름을 확인할 수 있습니다.</p>
+    <div class="tabs"><button class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button data-tab="paste" onclick="switchTab('paste')">공지 붙여넣기</button><button data-tab="file" onclick="switchTab('file')">파일 업로드</button><button data-tab="url" onclick="switchTab('url')">URL 입력</button></div>
+    <div id="tab-direct">
+      <div class="field"><label>일정명 *</label><input id="fTitle" placeholder="예: 자료구조 과제 제출"></div>
+      <div class="field"><label>일정 종류 *</label><select id="fType"><option>과제</option><option>시험</option><option>발표</option><option>팀 프로젝트</option></select></div>
+      <div class="field"><label>마감 날짜 *</label><input id="fDate" type="date"></div>
+      <div class="field"><label>중요도</label><select id="fImportance"><option>높음</option><option selected>보통</option><option>낮음</option></select></div>
+      <div class="field"><label>예상 소요 시간</label><select id="fEffort"><option value="30">30분</option><option value="60" selected>1시간</option><option value="120">2시간</option><option value="180">3시간</option><option value="300">5시간 이상</option></select></div>
+      <div class="field"><label>진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
+    </div>
+    <div id="tab-paste" class="hidden">
+      <div class="field"><label>강의 공지 붙여넣기</label><textarea id="noticeInput" placeholder="예: [자료구조] 3주차 과제 안내&#10;11월 20일까지 LMS에 제출하세요. 예상 소요 시간 3시간"></textarea></div>
+      <div class="notice" id="noticeMode"></div>
+      <button class="btn full" onclick="extractNotice()">일정 추출하기</button>
+      <p class="tiny" style="margin-top:9px">추출 결과는 직접 입력 탭에 채워지며, 확인·수정한 뒤 저장해야 반영됩니다.</p>
+    </div>
+    <div id="tab-file" class="hidden">
+      <div class="field"><label>안내문 파일 선택 (PNG, JPG, JPEG, PDF)</label><input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.pdf"></div>
+      <div class="notice">프로토타입에서는 실제 OCR/AI 추출을 실행하지 않습니다. 파일을 선택한 뒤 예시 정보 채우기를 누르면 확인용 샘플이 입력됩니다.</div>
+      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
+    </div>
+    <div id="tab-url" class="hidden">
+      <div class="field"><label>공개 웹페이지 URL</label><input id="urlInput" type="url" placeholder="https://example.com/notice"></div>
+      <div class="notice">실제 웹페이지 접속 및 Gemini 추출은 아직 연결되지 않았습니다. 공개 페이지를 가정한 예시 입력을 확인할 수 있습니다.</div>
+      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
+    </div>
+    <div class="row" style="margin-top:17px"><button class="btn" onclick="navigate('schedule')">취소</button><button class="btn primary" onclick="saveTask()">저장하기</button></div>
+  </section>
+
+  <section class="view" id="view-detail">
+    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+    <div id="detailContent"></div>
+  </section>
+
+  <nav class="nav">
+    <button data-nav="home" class="active" onclick="navigate('home')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9M9 21v-7h6v7"/></svg></b>홈</button>
+    <button data-nav="schedule" onclick="navigate('schedule')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg></b>일정</button>
+    <button data-nav="analysis" onclick="navigate('analysis')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/><path d="m19 16 .9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16Z"/></svg></b>AI 분석</button>
+    <button data-nav="settings" onclick="navigate('settings')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7Z"/><path d="m19.4 15 .1.1a1.8 1.8 0 0 1-2.5 2.5l-.1-.1a1.8 1.8 0 0 0-3 .9v.2a1.8 1.8 0 0 1-3.6 0v-.2a1.8 1.8 0 0 0-3-.9l-.1.1a1.8 1.8 0 0 1-2.5-2.5l.1-.1a1.8 1.8 0 0 0-.9-3H3.7a1.8 1.8 0 0 1 0-3.6h.2a1.8 1.8 0 0 0 .9-3l-.1-.1a1.8 1.8 0 0 1 2.5-2.5l.1.1a1.8 1.8 0 0 0 3-.9v-.2a1.8 1.8 0 0 1 3.6 0v.2a1.8 1.8 0 0 0 3 .9l.1-.1a1.8 1.8 0 0 1 2.5 2.5l-.1.1a1.8 1.8 0 0 0 .9 3h.2a1.8 1.8 0 0 1 0 3.6h-.2a1.8 1.8 0 0 0-.9 3Z"/></svg></b>설정</button>
+  </nav>
+</div>
+
+</main>
+
+<div class="modal-backdrop" id="resetModal"><div class="modal"><h3>모든 데이터를 초기화할까요?</h3><p>저장된 일정과 최근 분석 결과가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY='aiStudyPlannerV3Tasks'; // v4 사용자 데이터와 호환 유지
+const ANALYSIS_KEY='aiStudyPlannerV3Analysis'; // v4 분석 데이터와 호환 유지
+const AVAIL_KEY='aiStudyPlannerAvail'; // v6: 요일별 가용 시간(월~일, 시간 단위)
+const DEFAULT_AVAIL=[2,2,2,2,2,3,3];
+const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시간 수정
+// v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
+const AI_ENDPOINT='';
+let tasks=loadTasks(), analysis=loadAnalysis(), avail=loadAvail(), ovr=loadOvr(), currentView='home', selectedDate=isoDate(new Date()), weekOffset=0, editingId=null;
+const $=id=>document.getElementById(id);
+function loadTasks(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){return []}}
+function loadAnalysis(){try{return JSON.parse(localStorage.getItem(ANALYSIS_KEY))}catch(e){return null}}
+function loadAvail(){try{const a=JSON.parse(localStorage.getItem(AVAIL_KEY));return Array.isArray(a)&&a.length===7?a.map(Number):DEFAULT_AVAIL.slice()}catch(e){return DEFAULT_AVAIL.slice()}}
+function loadOvr(){try{return JSON.parse(localStorage.getItem(OVR_KEY))||{}}catch(e){return {}}}
+function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks));$('settingsCount').textContent=tasks.length+'개'}
+function isoDate(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
+function dateObj(s){return new Date(s+'T12:00:00')}
+function fmt(s){if(!s)return '-';const d=dateObj(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
+function navigate(view){currentView=view;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===view));const titles={home:'AI 학업 플래너',schedule:'일정 관리',analysis:'AI 분석',settings:'설정',form:editingId?'일정 수정':'일정 등록',detail:'일정 상세'};$('appTitle').textContent=titles[view]||view;if(view==='home')renderHome();if(view==='schedule')renderSchedule();if(view==='analysis')renderAnalysis();if(view==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail()}if(view==='detail')renderDetail()}
+function markStale(){ $('staleNotice').hidden=!analysis; }
+function renderHome(){
+ const done=tasks.filter(t=>t.status==='완료').length,rate=tasks.length?Math.round(done/tasks.length*100):0;
+ $('todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{dateStyle:'full'}).format(new Date());
+ $('totalCount').textContent=tasks.length+'개';$('completionRate').textContent=rate+'%';$('completionText').textContent=`${done} / ${tasks.length} 완료`;$('completionBar').style.width=rate+'%';
+ const todays=tasks.filter(t=>t.date===isoDate(new Date())).sort((a,b)=>a.title.localeCompare(b.title));
+ $('todayTasks').innerHTML=todays.length?todays.map(taskRow).join(''):(tasks.length?'<div class="empty">오늘 등록된 일정이 없습니다.</div>':'<div class="empty">등록된 일정이 없습니다.<br>일정 관리에서 추가하거나 예시 데이터로 먼저 체험해 보세요.<br><button class="btn small" style="margin-top:10px" onclick="seedSample()">예시 데이터 넣기</button></div>');
+ renderLoad('homeLoad',startOfWeek(new Date()));renderAdvice();renderAlloc();
+ $('sampleNotice').hidden=!tasks.some(t=>t.sample);
+ const rec=analysis?.items?.[0];$('homeRecommendation').innerHTML=rec?`<div class="card-title"><span>오늘 먼저 할 일정</span><span class="pill">${rec.grade} · ${rec.score}점</span></div><b>${escapeHtml(rec.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(rec.reason)}</p>`:'<div class="empty">아직 분석 결과가 없습니다.<br>AI 분석 화면에서 분석을 실행해 보세요.</div>';
+}
+function taskRow(t){return `<div class="task"><div style="min-width:0;flex:1"><div class="task-name">${escapeHtml(t.title)}${t.sample?' <span class="pill sample">예시</span>':''}</div><div class="task-meta">${escapeHtml(t.type)} · ${fmt(t.date)} · ${escapeHtml(t.status)}</div></div><div class="task-actions"><button onclick="openDetail('${t.id}')">상세</button></div></div>`}
+function startOfWeek(d){const x=new Date(d);x.setHours(12,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+function renderSchedule(){
+ const base=startOfWeek(dateObj(selectedDate));base.setDate(base.getDate()+weekOffset*7);
+ const names=['월','화','수','목','금','토','일'];$('weekGrid').innerHTML=names.map((n,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);const s=isoDate(d);return `<button class="day ${s===selectedDate?'selected':''} ${s===isoDate(new Date())?'today':''}" onclick="selectDate('${s}')">${n}<b>${d.getDate()}</b></button>`}).join('');
+ $('selectedDateLabel').textContent=fmt(selectedDate)+' 일정';
+ const list=tasks.filter(t=>t.date===selectedDate).sort((a,b)=>a.title.localeCompare(b.title));
+ renderLoad('scheduleLoad',base);renderDayAvail();
+ $('selectedTasks').innerHTML=list.length?list.map(taskRow).join(''):'<div class="empty">선택한 날짜에 일정이 없습니다.</div>';markStale();
+}
+function selectDate(s){selectedDate=s;weekOffset=0;renderSchedule()}
+function shiftWeek(n){weekOffset+=n;renderSchedule()}
+function openAdd(){editingId=null;clearForm();$('formHeading').textContent='일정 등록';switchTab('direct');$('fDate').value=selectedDate||isoDate(new Date());navigate('form')}
+function openDetail(id){editingId=id;navigate('detail')}
+function renderDetail(){
+ const t=tasks.find(x=>x.id===editingId);if(!t){$('detailContent').innerHTML='<div class="empty">일정을 찾을 수 없습니다.</div>';return}
+ $('detailContent').innerHTML=`<h1>${escapeHtml(t.title)}</h1><p class="sub">등록된 일정의 내용을 확인하고 수정할 수 있습니다.</p><div class="card"><div class="task"><span>종류</span><b>${escapeHtml(t.type)}</b></div><div class="task"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="task"><span>중요도</span><b>${escapeHtml(t.importance)}</b></div><div class="task"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div><div class="task"><span>진행 상태</span><select onchange="changeStatus('${t.id}',this.value)" style="padding:7px;border:1px solid #ddd;border-radius:6px;font-size:10px"><option ${t.status==='시작 전'?'selected':''}>시작 전</option><option ${t.status==='진행 중'?'selected':''}>진행 중</option><option ${t.status==='완료'?'selected':''}>완료</option></select></div></div>${analysis?.items?.find(x=>x.id===t.id)?`<div class="card"><h3>최근 AI 분석</h3><p class="sub">${escapeHtml(analysis.items.find(x=>x.id===t.id).reason)}</p></div>`:''}<button class="btn primary full" onclick="editTask('${t.id}')">일정 수정</button><button class="btn danger full" onclick="deleteTask('${t.id}')">일정 삭제</button>`;
+}
+function effortLabel(m){return m>=300?'5시간 이상':m>=180?'3시간':m>=120?'2시간':m>=60?'1시간':'30분'}
+function changeStatus(id,status){const t=tasks.find(x=>x.id===id);if(t){t.status=status;persist();markStale();renderDetail();toast('진행 상태가 변경되었습니다.');}}
+function editTask(id){const t=tasks.find(x=>x.id===id);if(!t)return;editingId=id;$('formHeading').textContent='일정 수정';$('fTitle').value=t.title;$('fType').value=t.type;$('fDate').value=t.date;$('fImportance').value=t.importance;$('fEffort').value=t.effort;$('fStatus').value=t.status;switchTab('direct');navigate('form')}
+function deleteTask(id){if(!confirm('이 일정을 삭제할까요?'))return;tasks=tasks.filter(t=>t.id!==id);persist();markStale();navigate('schedule');toast('일정이 삭제되었습니다.')}
+function clearForm(){['fTitle','fDate'].forEach(id=>$(id).value='');$('fType').value='과제';$('fImportance').value='보통';$('fEffort').value='60';$('fStatus').value='시작 전';}
+function switchTab(tab){['direct','paste','file','url'].forEach(x=>{$('tab-'+x).classList.toggle('hidden',x!==tab);document.querySelector(`[data-tab="${x}"]`).classList.toggle('active',x===tab)})}
+function fillSample(){if($('fileInput').files.length===0&&document.querySelector('[data-tab="file"]').classList.contains('active')){toast('먼저 파일을 선택해 주세요.');return} $('fTitle').value='자료구조 과제 제출';$('fType').value='과제';$('fDate').value=isoDate(new Date());$('fImportance').value='보통';$('fEffort').value='120';$('fStatus').value='시작 전';switchTab('direct');toast('예시 추출값을 입력했습니다. 내용을 확인하고 수정하세요.')}
+function saveTask(){
+ const title=$('fTitle').value.trim(),date=$('fDate').value;if(!title||!date){toast('일정명과 마감 날짜를 입력해 주세요.');return}
+ const data={title,type:$('fType').value,date,importance:$('fImportance').value,effort:Number($('fEffort').value),status:$('fStatus').value};
+ if(editingId){const t=tasks.find(x=>x.id===editingId);Object.assign(t,data);toast('일정이 수정되었습니다.')}else{tasks.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),...data});toast('일정이 등록되었습니다.')}
+ persist();markStale();selectedDate=date;weekOffset=0;navigate('schedule');
+}
+function scoreTask(t){const days=Math.ceil((dateObj(t.date)-dateObj(isoDate(new Date())))/86400000);const deadline=days<0?100:days===0?100:days===1?85:days<=3?70:days<=7?50:25;const importance={높음:100,보통:60,낮음:30}[t.importance]||60;const effort=t.effort>=300?90:t.effort>=180?75:t.effort>=120?60:t.effort>=60?40:25;let score=Math.round(deadline*.5+importance*.3+effort*.2);if(t.status==='완료')score=0;return {score,days}}
+function runAnalysis(){
+ if(!tasks.length){toast('먼저 일정을 등록해 주세요.');navigate('schedule');return}
+ const plan=buildPlan();
+ const items=tasks.map(t=>{const {score,days}=scoreTask(t);const grade=score>=75?'높음':score>=50?'보통':'낮음';let reason=days<0?'마감일이 지났습니다.':days===0?'마감일이 오늘입니다.':`마감까지 ${days}일 남았습니다.`;reason+=` 중요도 ${t.importance}, 예상 소요 시간 ${effortLabel(t.effort)}을 반영했습니다.`;if(plan.taskShort[t.id])reason+=` 입력한 가용 시간 기준으로 마감 전까지 약 ${fh(plan.taskShort[t.id])}이 부족합니다.`;let action=t.status==='완료'?'완료된 일정입니다.':days<=1?'남은 작업을 확인하고 제출 또는 준비를 마무리하세요.':'작업을 작은 단계로 나누고 첫 단계부터 진행하세요.';return {id:t.id,title:t.title,score,grade,reason,action,status:t.status}}).sort((a,b)=>b.score-a.score);
+ analysis={createdAt:new Date().toISOString(),items};localStorage.setItem(ANALYSIS_KEY,JSON.stringify(analysis));renderAnalysis();renderHome();toast('우선순위 분석이 완료되었습니다.');
+}
+function renderAnalysis(){
+ if(!analysis){$('analysisContent').innerHTML=tasks.length?'<div class="card empty">아직 분석 결과가 없습니다.<br>아래 버튼을 눌러 분석을 시작하세요.</div>':'<div class="card empty">등록된 일정이 없습니다.<br>일정을 먼저 추가해 주세요.</div>';return}
+ const first=analysis.items.find(x=>x.status!=='완료')||analysis.items[0];
+ $('analysisContent').innerHTML=`<div class="card"><div class="card-title"><span>오늘 가장 먼저 할 일정</span><span class="pill">${first.grade} · ${first.score}점</span></div><b>${escapeHtml(first.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(first.reason)}</p><p class="sub" style="margin:5px 0 0">행동 추천: ${escapeHtml(first.action)}</p></div><h2>일정별 우선순위</h2>${analysis.items.map(x=>`<div class="card"><div class="card-title"><span>${escapeHtml(x.title)}</span><span class="pill">${x.grade} · ${x.score}점</span></div><div class="scorebar"><i style="width:${x.score}%"></i></div><p class="sub"><b>분석 이유</b><br>${escapeHtml(x.reason)}</p><p class="sub"><b>행동 추천</b><br>${escapeHtml(x.action)}</p></div>`).join('')}<p class="tiny">마지막 분석: ${new Date(analysis.createdAt).toLocaleString('ko-KR')}</p>`;
+}
+function showResetModal(){$('resetModal').classList.add('show')}function hideResetModal(){$('resetModal').classList.remove('show')}
+function confirmReset(){tasks=[];analysis=null;avail=DEFAULT_AVAIL.slice();ovr={};localStorage.removeItem(OVR_KEY);localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(ANALYSIS_KEY);localStorage.removeItem(AVAIL_KEY);hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
+
+/* ===== v6: 가용 시간 · 주간 부하 · 예시 데이터 ===== */
+const DAY_NAMES=['월','화','수','목','금','토','일'];
+function fh(h){return (Math.round(h*10)/10)+'시간'}
+function availOn(d){const k=isoDate(d);if(ovr[k]!==undefined)return Number(ovr[k])||0;return Number(avail[(d.getDay()+6)%7])||0}
+// 마감 임박 순으로, 각 일정의 소요 시간을 마감일부터 거꾸로 가용 시간에 채워 넣는다(날짜 계산은 코드가 담당).
+function buildPlan(){
+ const today=dateObj(isoDate(new Date())),used={},short={},taskShort={},alloc={};
+ tasks.filter(t=>t.status!=='완료').sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
+  let rem=t.effort/60,dl=dateObj(t.date);if(dl<today)dl=new Date(today);
+  for(const d=new Date(dl);d>=today&&rem>0;d.setDate(d.getDate()-1)){
+   const k=isoDate(d),take=Math.min(Math.max(0,availOn(d)-(used[k]||0)),rem);
+   if(take>0){used[k]=(used[k]||0)+take;rem-=take;(alloc[k]=alloc[k]||[]).push({id:t.id,title:t.title,h:take})}
+  }
+  if(rem>0.001){const k=isoDate(dl);short[k]=(short[k]||0)+rem;taskShort[t.id]=rem}
+ });
+ return {used,short,taskShort,alloc};
+}
+function renderLoad(elId,base){
+ const el=$(elId);if(!el)return;
+ const plan=buildPlan(),today=isoDate(new Date());
+ const days=DAY_NAMES.map((n,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);const k=isoDate(d);return {n,k,cap:availOn(d),used:plan.used[k]||0,short:plan.short[k]||0,past:k<today}});
+ const max=Math.max(4,...days.map(x=>Math.max(x.cap,x.used+x.short)));
+ const over=days.filter(x=>x.short>0.001),total=over.reduce((a,x)=>a+x.short,0);
+ const hasData=tasks.some(t=>t.status!=='완료');
+ el.innerHTML=`<div class="card-title"><span>주간 부하</span><span class="tiny">점선 = 내 가용 시간</span></div>
+ <div class="load">${days.map(x=>`<div class="load-col ${x.past?'past':''} ${x.k===today?'today':''}"><div class="load-bar"><i class="cap" style="bottom:${x.cap/max*100}%"></i><i class="use" style="height:${x.used/max*100}%"></i><i class="short" style="height:${x.short/max*100}%;bottom:${x.used/max*100}%"></i></div><b class="${x.short>0.001?'bad':''}">${x.short>0.001?'+'+fh(x.short).replace('시간','h'):(x.used?fh(x.used).replace('시간','h'):'-')}</b><span>${x.n}</span></div>`).join('')}</div>
+ <p class="load-msg ${over.length?'bad':''}">${!hasData?'일정을 등록하면 주간 부하가 표시됩니다.':over.length?`⚠ 가용 시간이 부족한 날이 ${over.length}일 있습니다 (합계 +${fh(total)}). 막대 위 빨간 부분은 마감 전까지 배정하지 못한 시간입니다.`:'이 주는 입력한 가용 시간 안에서 소화할 수 있습니다.'}</p>`;
+}
+function renderAvail(){
+ $('availGrid').innerHTML=DAY_NAMES.map((n,i)=>`<label class="avail"><span>${n}</span><input type="number" min="0" max="16" step="0.5" value="${avail[i]}" onchange="setAvail(${i},this.value)"></label>`).join('');
+}
+function setAvail(i,v){const n=Math.min(16,Math.max(0,Number(v)||0));avail[i]=n;localStorage.setItem(AVAIL_KEY,JSON.stringify(avail));renderAvail();markStale();toast('가용 시간이 저장되었습니다.')}
+function seedSample(){
+ if(tasks.some(t=>t.sample)){toast('이미 예시 데이터가 있습니다.');return}
+ const off=n=>{const d=new Date();d.setDate(d.getDate()+n);return isoDate(d)};
+ const rows=[['자료구조 과제 제출','과제',2,'높음',180],['생성형 AI 팀 프로젝트 발표','팀 프로젝트',3,'높음',300],['영어 퀴즈 준비','시험',3,'보통',120],['독서 감상문','과제',5,'낮음',60],['데이터베이스 중간고사','시험',6,'높음',300]];
+ rows.forEach(r=>tasks.push({id:'sample-'+Date.now()+'-'+r[0].length+r[2],title:r[0],type:r[1],date:off(r[2]),importance:r[3],effort:r[4],status:'시작 전',sample:true}));
+ persist();markStale();navigate(currentView==='settings'?'settings':'home');toast('예시 데이터 5건을 넣었습니다.');
+}
+function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();markStale();analysis=null;localStorage.removeItem(ANALYSIS_KEY);navigate(currentView);toast('예시 데이터를 삭제했습니다.')}
+
+/* ===== v7: 오늘 할 일 · 조정 제안 · 날짜별 가용 시간 · 공지 붙여넣기 · AI 연결 지점 ===== */
+function renderAlloc(){
+ const el=$('homeAlloc');if(!el)return;
+ const plan=buildPlan(),items=plan.alloc[isoDate(new Date())]||[];
+ el.innerHTML=items.length?items.map(x=>`<div class="task"><div class="task-name">${escapeHtml(x.title)}</div><span class="pill">${fh(x.h)}</span></div>`).join('')+`<p class="tiny" style="margin:8px 0 0">마감일부터 거꾸로 가용 시간에 배정한 오늘 몫입니다.</p>`:'<div class="empty">오늘 배정된 작업이 없습니다.</div>';
+}
+function buildAdvice(plan){
+ const today=dateObj(isoDate(new Date()));
+ return tasks.filter(t=>plan.taskShort[t.id]).map(t=>{
+  let dl=dateObj(t.date);if(dl<today)dl=today;
+  const days=Math.round((dl-today)/86400000)+1,sh=plan.taskShort[t.id];
+  return {title:t.title,short:sh,days,perDay:sh/days};
+ });
+}
+function renderAdvice(){
+ const el=$('homeAdvice');if(!el)return;
+ const list=buildAdvice(buildPlan());
+ el.innerHTML=list.length?`<div class="card advice"><div class="card-title"><span>조정이 필요한 일정</span></div>${list.map(a=>`<p><b>${escapeHtml(a.title)}</b><br>마감 전까지 ${fh(a.short)}이 부족합니다. 마감까지 ${a.days}일 동안 하루 ${fh(a.perDay)}씩 더 확보하거나, 소요 시간을 줄이거나, 다른 일정을 미뤄야 합니다.</p>`).join('')}</div>`:'';
+}
+function renderDayAvail(){
+ const el=$('dayAvail');if(!el)return;
+ const d=dateObj(selectedDate),has=ovr[selectedDate]!==undefined;
+ el.innerHTML=`<div class="card-title"><span>${fmt(selectedDate)} 가용 시간</span><span class="tiny">${has?'이 날만 수정됨':'요일 기본값 사용'}</span></div><div class="row"><input class="num" type="number" min="0" max="16" step="0.5" value="${availOn(d)}" onchange="setOvr('${selectedDate}',this.value)"><button class="btn small" onclick="setOvr('${selectedDate}','')">기본값으로</button></div><p class="tiny" style="margin:8px 0 0">알바·약속 등으로 이 날만 시간이 다르면 여기서 바꾸세요. 부하 막대에 바로 반영됩니다.</p>`;
+}
+function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}localStorage.setItem(OVR_KEY,JSON.stringify(ovr));markStale();renderSchedule();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
+
+// ---- AI 연결 지점: 엔드포인트가 있으면 중계 서버로, 없으면 규칙 기반 Mock으로 처리 ----
+async function aiCall(task,payload){
+ if(!AI_ENDPOINT)return null;
+ const r=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({task,...payload})});
+ if(!r.ok)throw new Error('AI 응답 오류 '+r.status);
+ return r.json();
+}
+const TYPES=['과제','시험','발표','팀 프로젝트'],IMPS=['높음','보통','낮음'],EFFORTS=[30,60,120,180,300];
+function nearestEffort(m){return EFFORTS.reduce((a,b)=>Math.abs(b-m)<Math.abs(a-m)?b:a)}
+function validExtract(o){return o&&typeof o.title==='string'&&o.title.trim()&&TYPES.includes(o.type)&&/^\d{4}-\d{2}-\d{2}$/.test(o.date||'')&&IMPS.includes(o.importance)&&EFFORTS.includes(Number(o.effort))}
+function parseDate(text){
+ const now=new Date(),today=dateObj(isoDate(now));let m,d=null;
+ if(m=text.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/))d=new Date(+m[1],+m[2]-1,+m[3],12);
+ else if(m=text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/))d=new Date(now.getFullYear(),+m[1]-1,+m[2],12);
+ else if(m=text.match(/(\d{1,2})\/(\d{1,2})/))d=new Date(now.getFullYear(),+m[1]-1,+m[2],12);
+ else if(/모레/.test(text)){d=new Date(today);d.setDate(d.getDate()+2)}
+ else if(/내일/.test(text)){d=new Date(today);d.setDate(d.getDate()+1)}
+ else if(/오늘/.test(text))d=new Date(today);
+ else if(m=text.match(/(이번|다음)\s*주\s*([월화수목금토일])요일/)){const idx='월화수목금토일'.indexOf(m[2]);d=new Date(startOfWeek(today));d.setDate(d.getDate()+idx+(m[1]==='다음'?7:0))}
+ if(d&&d<today&&!/(\d{4})/.test(text)&&!/이번|다음/.test(text))d.setFullYear(d.getFullYear()+1);
+ return d?isoDate(d):'';
+}
+function mockExtract(text){
+ const line=(text.split(/\n/).map(x=>x.trim()).find(Boolean)||'').replace(/^[\[\(【](.*?)[\]\)】]\s*/,'$1 ');
+ const type=/팀\s*프로젝트|팀플/.test(text)?'팀 프로젝트':/시험|중간고사|기말|퀴즈/.test(text)?'시험':/발표|PT|프레젠/i.test(text)?'발표':'과제';
+ const h=text.match(/(\d+(?:\.\d+)?)\s*시간/),effort=h?nearestEffort(parseFloat(h[1])*60):{시험:180,발표:120,'팀 프로젝트':300,과제:120}[type];
+ const importance=/중간고사|기말|필수|성적/.test(text)?'높음':'보통';
+ return {title:line.slice(0,40),type,date:parseDate(text),importance,effort};
+}
+async function extractNotice(){
+ const text=$('noticeInput').value.trim();if(!text){toast('공지 내용을 붙여넣어 주세요.');return}
+ let r=null,mode='규칙 기반(Mock)';
+ try{const x=await aiCall('extract',{text,today:isoDate(new Date())});if(validExtract(x)){r=x;mode='AI'}}catch(e){toast('AI 연결에 실패해 규칙 기반으로 추출했습니다.')}
+ if(!r)r=mockExtract(text);
+ $('fTitle').value=r.title;$('fType').value=r.type;$('fDate').value=r.date;$('fImportance').value=r.importance;$('fEffort').value=String(r.effort);$('fStatus').value='시작 전';
+ switchTab('direct');
+ toast(r.date?`${mode}으로 추출했습니다. 내용을 확인하고 수정하세요.`:'날짜를 찾지 못했습니다. 마감 날짜를 직접 입력해 주세요.');
+}
+async function getAiComment(){
+ const plan=buildPlan(),today=plan.alloc[isoDate(new Date())]||[],adv=buildAdvice(plan);
+ let text=null,mode='규칙 기반(Mock)';
+ try{const x=await aiCall('comment',{today:today.map(a=>({title:a.title,hours:a.h})),shortages:adv.map(a=>({title:a.title,shortHours:a.short,days:a.days}))});if(x&&typeof x.comment==='string'&&x.comment.trim()){text=x.comment.trim();mode='AI'}}catch(e){toast('AI 연결에 실패해 기본 문장을 보여줍니다.')}
+ if(!text){
+  text=today.length?`오늘은 ${today.map(a=>`${a.title} ${fh(a.h)}`).join(', ')} 순서로 진행하세요.`:'오늘 배정된 작업이 없습니다.';
+  if(adv.length)text+=` 다만 ${adv.map(a=>a.title).join(', ')}은(는) 가용 시간이 부족하니 일정이나 가용 시간을 조정해 보세요.`;
+ }
+ $('aiComment').innerHTML=`<div class="card"><div class="card-title"><span>AI 코멘트</span><span class="pill">${mode}</span></div><p class="sub" style="margin:0">${escapeHtml(text)}</p></div>`;
+}
+function init(){persist();renderAvail();$('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다.':'현재는 규칙 기반 Mock으로 추출합니다(AI 서버 미연결).';renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
+init();
+
+</script>
+</body>
+</html>
