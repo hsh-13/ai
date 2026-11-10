@@ -2,26 +2,30 @@ const STORAGE_KEY='aiStudyPlannerV3Tasks'; // v4 사용자 데이터와 호환 �
 const ANALYSIS_KEY='aiStudyPlannerV3Analysis'; // v4 분석 데이터와 호환 유지
 const AVAIL_KEY='aiStudyPlannerAvail'; // v6: 요일별 가용 시간(월~일, 시간 단위)
 const DEFAULT_AVAIL=[2,2,2,2,2,3,3];
+const USER_KEY='aiStudyPlannerUser'; // 현재 로그인한 아이디(이 브라우저의 세션)
+const ACCOUNTS_KEY='aiStudyPlannerAccounts'; // 이 브라우저의 로컬 계정 {아이디:{salt,hash}}
 const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시간 수정
 // v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
 const AI_ENDPOINT='';
-let tasks=loadTasks(), analysis=loadAnalysis(), avail=loadAvail(), ovr=loadOvr(), currentView='home', selectedDate=isoDate(new Date()), weekOffset=0, editingId=null;
+let user=loadUser(), authMode='login', tasks=loadTasks(), analysis=loadAnalysis(), avail=loadAvail(), ovr=loadOvr(), currentView='home', selectedDate=isoDate(new Date()), weekOffset=0, editingId=null;
 const $=id=>document.getElementById(id);
-function loadTasks(){try{return JSON.parse(localStorage.getItem(STORAGE_KEY))||[]}catch(e){return []}}
-function loadAnalysis(){try{return JSON.parse(localStorage.getItem(ANALYSIS_KEY))}catch(e){return null}}
-function loadAvail(){try{const a=JSON.parse(localStorage.getItem(AVAIL_KEY));return Array.isArray(a)&&a.length===7?a.map(Number):DEFAULT_AVAIL.slice()}catch(e){return DEFAULT_AVAIL.slice()}}
-function loadOvr(){try{return JSON.parse(localStorage.getItem(OVR_KEY))||{}}catch(e){return {}}}
-function persist(){localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks));$('settingsCount').textContent=tasks.length+'개'}
+function K(base){return user?base+'::'+user:base} // 로그인하면 계정별 키, 로그인 전은 기존 키
+function loadTasks(){try{return JSON.parse(localStorage.getItem(K(STORAGE_KEY)))||[]}catch(e){return []}}
+function loadAnalysis(){try{return JSON.parse(localStorage.getItem(K(ANALYSIS_KEY)))}catch(e){return null}}
+function loadAvail(){try{const a=JSON.parse(localStorage.getItem(K(AVAIL_KEY)));return Array.isArray(a)&&a.length===7?a.map(Number):DEFAULT_AVAIL.slice()}catch(e){return DEFAULT_AVAIL.slice()}}
+function loadUser(){try{return localStorage.getItem(USER_KEY)||''}catch(e){return ''}}
+function loadOvr(){try{return JSON.parse(localStorage.getItem(K(OVR_KEY)))||{}}catch(e){return {}}}
+function persist(){localStorage.setItem(K(STORAGE_KEY),JSON.stringify(tasks));$('settingsCount').textContent=tasks.length+'개'}
 function isoDate(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
 function dateObj(s){return new Date(s+'T12:00:00')}
 function fmt(s){if(!s)return '-';const d=dateObj(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
-function navigate(view){currentView=view;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===view));const titles={home:'AI 학업 플래너',schedule:'일정 관리',analysis:'AI 분석',settings:'설정',form:editingId?'일정 수정':'일정 등록',detail:'일정 상세'};$('appTitle').textContent=titles[view]||view;if(view==='home')renderHome();if(view==='schedule')renderSchedule();if(view==='analysis')renderAnalysis();if(view==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail()}if(view==='detail')renderDetail()}
+function navigate(view){currentView=view;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===(view==='terms'||view==='privacy'?'settings':view)));const titles={home:'AI 학업 플래너',schedule:'일정 관리',analysis:'AI 분석',settings:'마이 페이지',terms:'이용 약관',privacy:'개인정보 취급 안내',form:editingId?'일정 수정':'일정 등록',detail:'일정 상세'};$('appTitle').textContent=titles[view]||view;if(view==='home')renderHome();if(view==='schedule')renderSchedule();if(view==='analysis')renderAnalysis();if(view==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile()}if(view==='detail')renderDetail()}
 function markStale(){ $('staleNotice').hidden=!analysis; }
 function renderHome(){
  const done=tasks.filter(t=>t.status==='완료').length,rate=tasks.length?Math.round(done/tasks.length*100):0;
- $('todayLabel').textContent=new Intl.DateTimeFormat('ko-KR',{dateStyle:'full'}).format(new Date());
+ $('todayLabel').textContent=(user?user+'님, ':'')+new Intl.DateTimeFormat('ko-KR',{dateStyle:'full'}).format(new Date());
  $('totalCount').textContent=tasks.length+'개';$('completionRate').textContent=rate+'%';$('completionText').textContent=`${done} / ${tasks.length} 완료`;$('completionBar').style.width=rate+'%';
  const todays=tasks.filter(t=>t.date===isoDate(new Date())).sort((a,b)=>a.title.localeCompare(b.title));
  $('todayTasks').innerHTML=todays.length?todays.map(taskRow).join(''):(tasks.length?'<div class="empty">오늘 등록된 일정이 없습니다.</div>':'<div class="empty">등록된 일정이 없습니다.<br>일정 관리에서 추가하거나 예시 데이터로 먼저 체험해 보세요.<br><button class="btn small" style="margin-top:10px" onclick="seedSample()">예시 데이터 넣기</button></div>');
@@ -65,7 +69,7 @@ function runAnalysis(){
  if(!tasks.length){toast('먼저 일정을 등록해 주세요.');navigate('schedule');return}
  const plan=buildPlan();
  const items=tasks.map(t=>{const {score,days}=scoreTask(t);const grade=score>=75?'높음':score>=50?'보통':'낮음';let reason=days<0?'마감일이 지났습니다.':days===0?'마감일이 오늘입니다.':`마감까지 ${days}일 남았습니다.`;reason+=` 중요도 ${t.importance}, 예상 소요 시간 ${effortLabel(t.effort)}을 반영했습니다.`;if(plan.taskShort[t.id])reason+=` 입력한 가용 시간 기준으로 마감 전까지 약 ${fh(plan.taskShort[t.id])}이 부족합니다.`;let action=t.status==='완료'?'완료된 일정입니다.':days<=1?'남은 작업을 확인하고 제출 또는 준비를 마무리하세요.':'작업을 작은 단계로 나누고 첫 단계부터 진행하세요.';return {id:t.id,title:t.title,score,grade,reason,action,status:t.status}}).sort((a,b)=>b.score-a.score);
- analysis={createdAt:new Date().toISOString(),items};localStorage.setItem(ANALYSIS_KEY,JSON.stringify(analysis));renderAnalysis();renderHome();toast('우선순위 분석이 완료되었습니다.');
+ analysis={createdAt:new Date().toISOString(),items};localStorage.setItem(K(ANALYSIS_KEY),JSON.stringify(analysis));renderAnalysis();renderHome();toast('우선순위 분석이 완료되었습니다.');
 }
 function renderAnalysis(){
  if(!analysis){$('analysisContent').innerHTML=tasks.length?'<div class="card empty">아직 분석 결과가 없습니다.<br>아래 버튼을 눌러 분석을 시작하세요.</div>':'<div class="card empty">등록된 일정이 없습니다.<br>일정을 먼저 추가해 주세요.</div>';return}
@@ -73,7 +77,7 @@ function renderAnalysis(){
  $('analysisContent').innerHTML=`<div class="card"><div class="card-title"><span>오늘 가장 먼저 할 일정</span><span class="pill">${first.grade} · ${first.score}점</span></div><b>${escapeHtml(first.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(first.reason)}</p><p class="sub" style="margin:5px 0 0">행동 추천: ${escapeHtml(first.action)}</p></div><h2>일정별 우선순위</h2>${analysis.items.map(x=>`<div class="card"><div class="card-title"><span>${escapeHtml(x.title)}</span><span class="pill">${x.grade} · ${x.score}점</span></div><div class="scorebar"><i style="width:${x.score}%"></i></div><p class="sub"><b>분석 이유</b><br>${escapeHtml(x.reason)}</p><p class="sub"><b>행동 추천</b><br>${escapeHtml(x.action)}</p></div>`).join('')}<p class="tiny">마지막 분석: ${new Date(analysis.createdAt).toLocaleString('ko-KR')}</p>`;
 }
 function showResetModal(){$('resetModal').classList.add('show')}function hideResetModal(){$('resetModal').classList.remove('show')}
-function confirmReset(){tasks=[];analysis=null;avail=DEFAULT_AVAIL.slice();ovr={};localStorage.removeItem(OVR_KEY);localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(ANALYSIS_KEY);localStorage.removeItem(AVAIL_KEY);hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
+function confirmReset(){tasks=[];analysis=null;avail=DEFAULT_AVAIL.slice();ovr={};localStorage.removeItem(K(OVR_KEY));localStorage.removeItem(K(STORAGE_KEY));localStorage.removeItem(K(ANALYSIS_KEY));localStorage.removeItem(K(AVAIL_KEY));hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
 
 /* ===== v6: 가용 시간 · 주간 부하 · 예시 데이터 ===== */
 const DAY_NAMES=['월','화','수','목','금','토','일'];
@@ -106,7 +110,7 @@ function renderLoad(elId,base){
 function renderAvail(){
  $('availGrid').innerHTML=DAY_NAMES.map((n,i)=>`<label class="avail"><span>${n}</span><input type="number" min="0" max="16" step="0.5" value="${avail[i]}" onchange="setAvail(${i},this.value)"></label>`).join('');
 }
-function setAvail(i,v){const n=Math.min(16,Math.max(0,Number(v)||0));avail[i]=n;localStorage.setItem(AVAIL_KEY,JSON.stringify(avail));renderAvail();markStale();toast('가용 시간이 저장되었습니다.')}
+function setAvail(i,v){const n=Math.min(16,Math.max(0,Number(v)||0));avail[i]=n;localStorage.setItem(K(AVAIL_KEY),JSON.stringify(avail));renderAvail();markStale();toast('가용 시간이 저장되었습니다.')}
 function seedSample(){
  if(tasks.some(t=>t.sample)){toast('이미 예시 데이터가 있습니다.');return}
  const off=n=>{const d=new Date();d.setDate(d.getDate()+n);return isoDate(d)};
@@ -114,7 +118,7 @@ function seedSample(){
  rows.forEach(r=>tasks.push({id:'sample-'+Date.now()+'-'+r[0].length+r[2],title:r[0],type:r[1],date:off(r[2]),importance:r[3],effort:r[4],status:'시작 전',sample:true}));
  persist();markStale();navigate(currentView==='settings'?'settings':'home');toast('예시 데이터 5건을 넣었습니다.');
 }
-function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();markStale();analysis=null;localStorage.removeItem(ANALYSIS_KEY);navigate(currentView);toast('예시 데이터를 삭제했습니다.')}
+function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();markStale();analysis=null;localStorage.removeItem(K(ANALYSIS_KEY));navigate(currentView);toast('예시 데이터를 삭제했습니다.')}
 
 /* ===== v7: 오늘 할 일 · 조정 제안 · 날짜별 가용 시간 · 공지 붙여넣기 · AI 연결 지점 ===== */
 function renderAlloc(){
@@ -140,7 +144,7 @@ function renderDayAvail(){
  const d=dateObj(selectedDate),has=ovr[selectedDate]!==undefined;
  el.innerHTML=`<div class="card-title"><span>${fmt(selectedDate)} 가용 시간</span><span class="tiny">${has?'이 날만 수정됨':'요일 기본값 사용'}</span></div><div class="row"><input class="num" type="number" min="0" max="16" step="0.5" value="${availOn(d)}" onchange="setOvr('${selectedDate}',this.value)"><button class="btn small" onclick="setOvr('${selectedDate}','')">기본값으로</button></div><p class="tiny" style="margin:8px 0 0">알바·약속 등으로 이 날만 시간이 다르면 여기서 바꾸세요. 부하 막대에 바로 반영됩니다.</p>`;
 }
-function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}localStorage.setItem(OVR_KEY,JSON.stringify(ovr));markStale();renderSchedule();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
+function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}localStorage.setItem(K(OVR_KEY),JSON.stringify(ovr));markStale();renderSchedule();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
 
 // ---- AI 연결 지점: 엔드포인트가 있으면 중계 서버로, 없으면 규칙 기반 Mock으로 처리 ----
 async function aiCall(task,payload){
@@ -189,6 +193,59 @@ async function getAiComment(){
   if(adv.length)text+=` 다만 ${adv.map(a=>a.title).join(', ')}은(는) 가용 시간이 부족하니 일정이나 가용 시간을 조정해 보세요.`;
  }
  $('aiComment').innerHTML=`<div class="card"><div class="card-title"><span>AI 코멘트</span><span class="pill">${mode}</span></div><p class="sub" style="margin:0">${escapeHtml(text)}</p></div>`;
+}
+
+/* ===== 마이 페이지: 이 브라우저 안의 로컬 계정(서버 인증 아님) ===== */
+function getAccounts(){try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY))||{}}catch(e){return {}}}
+function setAccounts(a){localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(a))}
+async function hashPw(salt,pw){
+ if(!(window.crypto&&crypto.subtle))throw new Error('nocrypto');
+ const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));
+ return Array.from(new Uint8Array(buf)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function newSalt(){return Array.from(crypto.getRandomValues(new Uint8Array(8))).map(x=>x.toString(16).padStart(2,'0')).join('')}
+function renderProfile(){
+ const el=$('profileCard');if(!el)return;
+ if(user){
+  el.innerHTML=`<div class="card-title"><span>내 계정</span><span class="pill">로그인됨</span></div><p class="profile-name">${escapeHtml(user)}</p><p class="tiny" style="margin:0 0 12px">일정·가용 시간·분석 결과가 이 아이디로 따로 저장됩니다. 이 브라우저 안의 로컬 계정이며 서버 인증이 아닙니다.</p><button class="btn full" style="margin-top:0" onclick="logout()">로그아웃</button><button class="btn full danger-text" onclick="deleteAccount()">계정 삭제</button>`;
+  return;
+ }
+ const su=authMode==='signup';
+ el.innerHTML=`<div class="card-title"><span>${su?'회원가입':'로그인'}</span><span class="pill">로그인 전</span></div>
+ <div class="field" style="margin:0 0 10px"><label>아이디 (영문 소문자·숫자·_ 4~16자)</label><input id="authId" maxlength="16" autocomplete="username" autocapitalize="off"></div>
+ <div class="field" style="margin:0 0 10px"><label>비밀번호 (6자 이상)</label><input id="authPw" type="password" autocomplete="${su?'new-password':'current-password'}" ${su?'':'onkeydown="if(event.key===\'Enter\')submitAuth()"'}></div>
+ ${su?'<div class="field" style="margin:0 0 10px"><label>비밀번호 확인</label><input id="authPw2" type="password" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')submitAuth()"></div>':''}
+ <button class="btn primary full" style="margin-top:0" onclick="submitAuth()">${su?'가입하고 로그인':'로그인'}</button>
+ <button class="btn full" onclick="authMode='${su?'login':'signup'}';renderProfile()">${su?'이미 계정이 있어요':'회원가입'}</button>
+ <p class="tiny" style="margin:9px 0 0">이 브라우저 안에서만 동작하는 계정입니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없으며, 비밀번호를 잊으면 찾을 수 없습니다. 로그인 전에 입력한 일정은 로그인한 계정에서 보이지 않습니다(로그아웃하면 다시 보입니다).</p>`;
+}
+async function submitAuth(){
+ const id=($('authId').value||'').trim().toLowerCase(),pw=$('authPw').value||'';
+ if(!/^[a-z0-9_]{4,16}$/.test(id)){toast('아이디는 영문 소문자·숫자·_ 4~16자로 입력해 주세요.');return}
+ if(pw.length<6){toast('비밀번호는 6자 이상 입력해 주세요.');return}
+ const acc=getAccounts();
+ try{
+  if(authMode==='signup'){
+   if(pw!==$('authPw2').value){toast('비밀번호 확인이 일치하지 않습니다.');return}
+   if(acc[id]){toast('이미 있는 아이디입니다.');return}
+   const salt=newSalt();acc[id]={salt,hash:await hashPw(salt,pw)};setAccounts(acc);
+  }else{
+   if(!acc[id]||acc[id].hash!==await hashPw(acc[id].salt,pw)){toast('아이디 또는 비밀번호가 올바르지 않습니다.');return}
+  }
+ }catch(e){toast(e.message==='nocrypto'?'이 환경에서는 로그인 기능을 쓸 수 없습니다(HTTPS 필요).':'처리 중 오류가 발생했습니다.');return}
+ const wasSignup=authMode==='signup';switchUser(id);toast(`${id}님, ${wasSignup?'가입 후 ':''}로그인했습니다.`);
+}
+function switchUser(id){
+ user=id;try{id?localStorage.setItem(USER_KEY,id):localStorage.removeItem(USER_KEY)}catch(e){}
+ authMode='login';tasks=loadTasks();analysis=loadAnalysis();avail=loadAvail();ovr=loadOvr();
+ persist();renderHome();renderSchedule();renderAnalysis();markStale();navigate('settings');
+}
+function logout(){switchUser('');toast('로그아웃했습니다. 계정 데이터는 이 브라우저에 남아 있습니다.')}
+function deleteAccount(){
+ if(!user||!confirm(`계정 "${user}"와 이 계정의 일정·설정·분석 결과를 삭제합니다. 되돌릴 수 없습니다.`))return;
+ const id=user,acc=getAccounts();delete acc[id];setAccounts(acc);
+ [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY].forEach(k=>localStorage.removeItem(k+'::'+id));
+ switchUser('');toast('계정을 삭제했습니다.');
 }
 function init(){persist();renderAvail();$('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다.':'현재는 규칙 기반 Mock으로 추출합니다(AI 서버 미연결).';renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
 init();
