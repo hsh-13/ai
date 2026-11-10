@@ -153,6 +153,11 @@ footer{display:none}
 .num{width:100%;padding:10px;border:1px solid #dce5ef;border-radius:10px;font-size:12px}
 #noticeInput{min-height:120px}
 
+/* ===== 하단 탭·상단 바 고정: app-shell의 overflow:hidden이 sticky를 막고 있었음 ===== */
+.app-shell{overflow:visible}
+.appbar{position:sticky;top:0;z-index:30}
+.nav{position:sticky;bottom:0;z-index:30}
+
 </style>
 </head>
 <body>
