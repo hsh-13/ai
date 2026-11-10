@@ -13,24 +13,26 @@
   <div class="appbar"><strong id="appTitle">AI 학업 플래너</strong></div>
 
   <section class="view active" id="view-home">
-    <h1>오늘의 학업 현황</h1><p class="sub" id="todayLabel">오늘 해야 할 일을 확인하세요.</p>
-    <div class="grid2">
+    <div class="hero"><h1>오늘의 학업 현황</h1><p class="sub" id="todayLabel">오늘 해야 할 일을 확인하세요.</p></div>
+    <div id="homeSummary"></div>
+    <div class="stat3">
       <div class="stat"><span class="tiny">전체 일정</span><b id="totalCount">0개</b></div>
-      <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b></div>
+      <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b><div class="progress"><i id="completionBar" style="width:0%"></i></div><span id="completionText" class="tiny">0 / 0 완료</span></div>
+      <div class="stat" id="nearestBox"><span class="tiny">가장 가까운 마감</span><b id="nearestDday">-</b></div>
     </div>
-    <div class="card"><div class="card-title"><span>학습 진행 현황</span><span id="completionText" class="tiny">0 / 0 완료</span></div><div class="progress"><i id="completionBar" style="width:0%"></i></div></div>
     <div class="notice" id="sampleNotice" hidden>예시 데이터가 포함되어 있습니다. 실제 일정이 아니며 마이 페이지에서 삭제할 수 있습니다.</div>
     <div class="card" id="homeLoad"></div>
     <div id="homeAdvice"></div>
-    <h2>오늘 할 일</h2><div class="card" id="homeAlloc"></div>
-    <h2>오늘의 일정</h2><div class="card" id="todayTasks"></div>
-    <h2>AI 우선순위 추천</h2><div class="card" id="homeRecommendation"></div>
+    <div class="sec"><b>오늘 할 일</b><small id="allocMeta"></small></div><div id="homeAlloc"></div>
+    <div class="sec"><b>오늘의 일정</b></div><div id="todayTasks"></div>
+    <div class="sec"><b>AI 우선순위 추천</b></div><div class="card" id="homeRecommendation"></div>
     <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
   </section>
 
   <section class="view" id="view-schedule">
     <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
     <div class="week" id="weekGrid"></div>
+    <div class="legend"><span class="ok">여유</span><span class="tight">빠듯</span><span class="bad">부족</span><span class="none">일정 없음</span></div>
     <div class="card" id="scheduleLoad"></div>
     <div class="card" id="dayAvail"></div>
     <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
@@ -39,8 +41,8 @@
 
   <section class="view" id="view-analysis">
     <h1>AI 학업 분석</h1><p class="sub">마감일·중요도·예상 소요 시간을 기준으로 우선순위를 계산합니다.</p>
-    <div id="analysisContent"></div>
     <div id="aiComment"></div>
+    <div id="analysisContent"></div>
     <button class="btn full" onclick="getAiComment()">AI 코멘트 받기</button>
     <button class="btn primary full" onclick="runAnalysis()">✦ 지금 분석하기 / 다시 분석하기</button>
     <p class="tiny" style="margin-top:9px">현재는 Mock 분석 모드입니다. 우선순위는 브라우저의 규칙 기반 계산으로 제공되며 실제 Gemini API는 연결되지 않았습니다.</p>
@@ -49,7 +51,7 @@
   <section class="view" id="view-settings">
     <h1>마이 페이지</h1><p class="sub">내 정보와 저장된 데이터를 관리합니다.</p>
     <div class="card" id="profileCard"></div>
-    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>프로토타입 v2.2</span></div></div>
+    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>프로토타입 v2.3</span></div></div>
     <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)을 입력하면 주간 부하와 우선순위 분석에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
     <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 삭제합니다. 예시 일정에는 "예시" 표시가 붙습니다.</p><div class="row"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
     <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
@@ -121,6 +123,7 @@
     <div id="detailContent"></div>
   </section>
 
+  <button class="fab" id="fab" onclick="openAdd()" aria-label="일정 추가"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
   <nav class="nav">
     <button data-nav="home" class="active" onclick="navigate('home')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9M9 21v-7h6v7"/></svg></b>홈</button>
     <button data-nav="schedule" onclick="navigate('schedule')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg></b>일정</button>

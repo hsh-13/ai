@@ -21,23 +21,61 @@ function dateObj(s){return new Date(s+'T12:00:00')}
 function fmt(s){if(!s)return '-';const d=dateObj(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');setTimeout(()=>el.classList.remove('show'),2200)}
-function navigate(view){currentView=view;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===(view==='terms'||view==='privacy'?'settings':view)));const titles={home:'AI 학업 플래너',schedule:'일정 관리',analysis:'AI 분석',settings:'마이 페이지',terms:'이용 약관',privacy:'개인정보 취급 안내',form:editingId?'일정 수정':'일정 등록',detail:'일정 상세'};$('appTitle').textContent=titles[view]||view;if(view==='home')renderHome();if(view==='schedule')renderSchedule();if(view==='analysis')renderAnalysis();if(view==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile()}if(view==='detail')renderDetail()}
+function navigate(view){currentView=view;document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===(view==='terms'||view==='privacy'?'settings':view)));const titles={home:'AI 학업 플래너',schedule:'일정 관리',analysis:'AI 분석',settings:'마이 페이지',terms:'이용 약관',privacy:'개인정보 취급 안내',form:editingId?'일정 수정':'일정 등록',detail:'일정 상세'};$('appTitle').textContent=titles[view]||view;if(view==='home')renderHome();if(view==='schedule')renderSchedule();if(view==='analysis')renderAnalysis();if(view==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile()}if(view==='detail')renderDetail();$('fab').hidden=!(view==='home'||view==='schedule')}
 function markStale(){ $('staleNotice').hidden=!analysis; }
 function renderHome(){
  const done=tasks.filter(t=>t.status==='완료').length,rate=tasks.length?Math.round(done/tasks.length*100):0;
  $('todayLabel').textContent=(user?user+'님, ':'')+new Intl.DateTimeFormat('ko-KR',{dateStyle:'full'}).format(new Date());
  $('totalCount').textContent=tasks.length+'개';$('completionRate').textContent=rate+'%';$('completionText').textContent=`${done} / ${tasks.length} 완료`;$('completionBar').style.width=rate+'%';
  const todays=tasks.filter(t=>t.date===isoDate(new Date())).sort((a,b)=>a.title.localeCompare(b.title));
- $('todayTasks').innerHTML=todays.length?todays.map(taskRow).join(''):(tasks.length?'<div class="empty">오늘 등록된 일정이 없습니다.</div>':'<div class="empty">등록된 일정이 없습니다.<br>일정 관리에서 추가하거나 예시 데이터로 먼저 체험해 보세요.<br><button class="btn small" style="margin-top:10px" onclick="seedSample()">예시 데이터 넣기</button></div>');
- renderLoad('homeLoad',startOfWeek(new Date()));renderAdvice();renderAlloc();
+ $('todayTasks').innerHTML=todays.length?todays.map(taskRow).join(''):(tasks.length?'<div class="card empty">오늘 등록된 일정이 없습니다.</div>':'<div class="card empty">등록된 일정이 없습니다.<br>일정 관리에서 추가하거나 예시 데이터로 먼저 체험해 보세요.<br><button class="btn small" style="margin-top:10px" onclick="seedSample()">예시 데이터 넣기</button></div>');
+ renderLoad('homeLoad',startOfWeek(new Date()));renderAdvice();renderAlloc();renderSummary();renderNearest();
  $('sampleNotice').hidden=!tasks.some(t=>t.sample);
  const rec=analysis?.items?.[0];$('homeRecommendation').innerHTML=rec?`<div class="card-title"><span>오늘 먼저 할 일정</span><span class="pill">${rec.grade} · ${rec.score}점</span></div><b>${escapeHtml(rec.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(rec.reason)}</p>`:'<div class="empty">아직 분석 결과가 없습니다.<br>AI 분석 화면에서 분석을 실행해 보세요.</div>';
 }
-function taskRow(t){return `<div class="task"><div style="min-width:0;flex:1"><div class="task-name">${escapeHtml(t.title)}${t.sample?' <span class="pill sample">예시</span>':''}</div><div class="task-meta">${escapeHtml(t.type)} · ${fmt(t.date)} · ${escapeHtml(t.status)}</div></div><div class="task-actions"><button onclick="openDetail('${t.id}')">상세</button></div></div>`}
+/* ===== v2.3: 종류별 색·아이콘, D-day, 중요도 점 ===== */
+const TYPE_STYLE={'과제':'#2f6fd6','시험':'#d94545','발표':'#0f9f8f','팀 프로젝트':'#8b5cf6'};
+const TYPE_ICON={'과제':'<path d="M7 3h8l4 4v14H7z"/><path d="M15 3v4h4M10 12h6M10 16h6"/>','시험':'<path d="M5 4h14v16H5z"/><path d="M9 9l2 2 4-4M9 15h6"/>','발표':'<path d="M4 5h16v11H9l-5 4z"/>','팀 프로젝트':'<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0M15 15a5 5 0 0 1 6 5"/>'};
+function typeColor(t){return TYPE_STYLE[t]||TYPE_STYLE['과제']}
+function typeIcon(t){return `<svg viewBox="0 0 24 24" aria-hidden="true">${TYPE_ICON[t]||TYPE_ICON['과제']}</svg>`}
+function daysLeft(t){return Math.round((dateObj(t.date)-dateObj(isoDate(new Date())))/86400000)}
+function dday(t){if(t.status==='완료')return {label:'완료',cls:'rd'};const d=daysLeft(t);return d<0?{label:'지남',cls:'r1'}:d===0?{label:'오늘',cls:'r1'}:{label:'D-'+d,cls:d<=1?'r1':d<=3?'r2':'r3'}}
+function dots(t){const n={높음:3,보통:2,낮음:1}[t.importance]||2;return '●'.repeat(n)+'○'.repeat(3-n)}
+function taskRow(t){const d=dday(t);return `<div class="tk ${t.status==='완료'?'done':''}" style="--c:${typeColor(t.type)}" onclick="openDetail('${t.id}')" onkeydown="if(event.key==='Enter')openDetail('${t.id}')" role="button" tabindex="0"><div class="ti">${typeIcon(t.type)}</div><div class="tk-main"><b>${escapeHtml(t.title)}${t.sample?' <span class="pill sample">예시</span>':''}</b><small>${escapeHtml(t.type)} · ${fmt(t.date)} · 중요도 ${dots(t)}</small></div><div class="tk-r"><span class="dd ${d.cls}">${d.label}</span><small>${escapeHtml(t.status)}</small></div></div>`}
+function dayWord(k){const d=Math.round((dateObj(k)-dateObj(isoDate(new Date())))/86400000);if(d<=0)return '오늘';if(d===1)return '내일';if(d<7)return DAY_NAMES[(dateObj(k).getDay()+6)%7]+'요일';const x=dateObj(k);return `${x.getMonth()+1}/${x.getDate()}`}
+function hh(x){return (Math.round(x*10)/10)+'h'}
+function tightDay(x){return x.cap>0&&x.short<=0.001&&x.used/x.cap>=.9}
+// 홈 상단 판단 카드: 이번 주(오늘부터) 필요 시간과 가용 시간 비교. 빠듯함 기준(가용 시간의 90% 이상)은 이 프로토타입에서 정한 값이다.
+function renderSummary(){
+ const el=$('homeSummary');if(!el)return;
+ const plan=buildPlan(),base=startOfWeek(new Date()),today=isoDate(new Date());
+ let cap=0,need=0;
+ for(let i=0;i<7;i++){const d=new Date(base);d.setDate(base.getDate()+i);const k=isoDate(d);if(k<today)continue;cap+=availOn(d);need+=(plan.used[k]||0)+(plan.short[k]||0)}
+ const active=tasks.some(t=>t.status!=='완료');
+ const keys=Object.keys(plan.short).filter(k=>plan.short[k]>0.001).sort(),allShort=keys.reduce((a,k)=>a+plan.short[k],0);
+ const ratio=cap>0?need/cap:(need>0?1.2:0);
+ let st='none',title='아직 판단할 일정이 없어요',desc='일정을 추가하면 이번 주를 해낼 수 있는지 바로 판단해 드려요.';
+ if(!active&&tasks.length){title='모든 일정을 완료했어요';desc='새 일정을 추가하면 다시 판단해 드려요.'}
+ if(active){
+  if(keys.length){st='bad';title=`${dayWord(keys[0])}까지 ${hh(allShort)} 부족해요`;const adv=buildAdvice(plan).sort((a,b)=>a.days-b.days)[0];desc=adv?`${escapeHtml(adv.title)} 일정이 가장 급해요. 마감까지 하루 ${hh(adv.perDay)}씩 더 확보하세요.`:''}
+  else if(ratio>=.9){st='tight';title='이번 주는 빠듯해요';desc='가용 시간의 90% 이상을 쓰는 주입니다. 일정이 늘면 부족해질 수 있어요.'}
+  else{st='ok';title='이번 주는 여유 있어요';desc='등록된 일정을 입력한 가용 시간 안에서 끝낼 수 있습니다.'}
+ }
+ const col={ok:'#16a34a',tight:'#ee9a2c',bad:'#d94545',none:'#cbd5e6'}[st],C=220;
+ const icon=st==='ok'?'<circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M6.5 12.5l4 4 7-8" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>':st==='none'?'<circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M12 11v6M12 7v.5" stroke="#fff" stroke-width="3" stroke-linecap="round"/>':'<circle cx="12" cy="12" r="11" fill="currentColor"/><path d="M12 6.5v7M12 17v.5" stroke="#fff" stroke-width="3" stroke-linecap="round"/>';
+ const pct=active?Math.round(ratio*100)+'%':'-';
+ const chips=active?`<span class="chip">필요 ${hh(need)}</span><span class="chip">가용 ${hh(cap)}</span><span class="chip ${st==='bad'?'bad':''}">${st==='bad'?'부족 '+hh(allShort):'여유 '+hh(Math.max(0,cap-need))}</span>`:'';
+ el.innerHTML=`<div class="sumcard st-${st}"><div class="ring"><svg viewBox="0 0 84 84" aria-hidden="true"><circle cx="42" cy="42" r="35" fill="none" stroke="#edf2fa" stroke-width="9"/><circle cx="42" cy="42" r="35" fill="none" stroke="${col}" stroke-width="9" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${active?Math.round(C*(1-Math.min(ratio,1))):C}"/></svg><b><span>${pct}<small>이번 주 부하</small></span></b></div><div class="j"><span class="tg"><svg viewBox="0 0 24 24" aria-hidden="true">${icon}</svg>이번 주 판단</span><h2>${title}</h2><p>${desc}</p></div></div>${chips?`<div class="chips">${chips}</div>`:''}`;
+}
+function renderNearest(){
+ const list=tasks.filter(t=>t.status!=='완료').sort((a,b)=>a.date.localeCompare(b.date)),t=list[0],box=$('nearestBox');
+ if(!t){$('nearestDday').textContent='-';box.classList.remove('hot');return}
+ const d=daysLeft(t);$('nearestDday').textContent=d<0?'지남':d===0?'D-DAY':'D-'+d;box.classList.toggle('hot',d<=1);
+}
 function startOfWeek(d){const x=new Date(d);x.setHours(12,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
 function renderSchedule(){
  const base=startOfWeek(dateObj(selectedDate));base.setDate(base.getDate()+weekOffset*7);
- const names=['월','화','수','목','금','토','일'];$('weekGrid').innerHTML=names.map((n,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);const s=isoDate(d);return `<button class="day ${s===selectedDate?'selected':''} ${s===isoDate(new Date())?'today':''}" onclick="selectDate('${s}')">${n}<b>${d.getDate()}</b></button>`}).join('');
+ const names=['월','화','수','목','금','토','일'];const wp=buildPlan();$('weekGrid').innerHTML=names.map((n,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);const s=isoDate(d),x={cap:availOn(d),used:wp.used[s]||0,short:wp.short[s]||0},dc=x.short>0.001?'bad':tightDay(x)?'tight':(x.used>0?'ok':'none');return `<button class="day ${s===selectedDate?'selected':''} ${s===isoDate(new Date())?'today':''}" onclick="selectDate('${s}')">${n}<b>${d.getDate()}</b><i class="dot ${dc}"></i></button>`}).join('');
  $('selectedDateLabel').textContent=fmt(selectedDate)+' 일정';
  const list=tasks.filter(t=>t.date===selectedDate).sort((a,b)=>a.title.localeCompare(b.title));
  renderLoad('scheduleLoad',base);renderDayAvail();
@@ -73,8 +111,10 @@ function runAnalysis(){
 }
 function renderAnalysis(){
  if(!analysis){$('analysisContent').innerHTML=tasks.length?'<div class="card empty">아직 분석 결과가 없습니다.<br>아래 버튼을 눌러 분석을 시작하세요.</div>':'<div class="card empty">등록된 일정이 없습니다.<br>일정을 먼저 추가해 주세요.</div>';return}
+ const plan=buildPlan();
  const first=analysis.items.find(x=>x.status!=='완료')||analysis.items[0];
- $('analysisContent').innerHTML=`<div class="card"><div class="card-title"><span>오늘 가장 먼저 할 일정</span><span class="pill">${first.grade} · ${first.score}점</span></div><b>${escapeHtml(first.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(first.reason)}</p><p class="sub" style="margin:5px 0 0">행동 추천: ${escapeHtml(first.action)}</p></div><h2>일정별 우선순위</h2>${analysis.items.map(x=>`<div class="card"><div class="card-title"><span>${escapeHtml(x.title)}</span><span class="pill">${x.grade} · ${x.score}점</span></div><div class="scorebar"><i style="width:${x.score}%"></i></div><p class="sub"><b>분석 이유</b><br>${escapeHtml(x.reason)}</p><p class="sub"><b>행동 추천</b><br>${escapeHtml(x.action)}</p></div>`).join('')}<p class="tiny">마지막 분석: ${new Date(analysis.createdAt).toLocaleString('ko-KR')}</p>`;
+ const card=(x,i)=>{const t=tasks.find(y=>y.id===x.id),sh=plan.taskShort[x.id];return `<div class="rk"><div class="top"><div class="n ${i>1?'n3':''}">${i+1}</div><div class="rk-t"><b>${escapeHtml(x.title)}</b><small>${t?escapeHtml(t.type)+' · '+dday(t).label:''}</small></div><div class="sc">${x.score}<small> 점</small></div></div><div class="scorebar"><i style="width:${x.score}%"></i></div><p class="sub"><b>분석 이유</b><br>${escapeHtml(x.reason)}</p><p class="sub"><b>행동 추천</b><br>${escapeHtml(x.action)}</p><div class="tags"><span class="tg2">우선순위 ${x.grade}</span>${sh?`<span class="tg2 r">부족 ${hh(sh)}</span>`:''}${t?`<span class="tg2">소요 ${effortLabel(t.effort)}</span>`:''}</div></div>`};
+ $('analysisContent').innerHTML=`<div class="card first"><div class="card-title"><span>오늘 가장 먼저 할 일정</span><span class="pill">${first.grade} · ${first.score}점</span></div><b>${escapeHtml(first.title)}</b><p class="sub" style="margin:7px 0 0">${escapeHtml(first.reason)}</p><p class="sub" style="margin:5px 0 0">행동 추천: ${escapeHtml(first.action)}</p></div><div class="sec"><b>일정별 우선순위</b></div>${analysis.items.map(card).join('')}<p class="tiny">마지막 분석: ${new Date(analysis.createdAt).toLocaleString('ko-KR')}</p>`;
 }
 function showResetModal(){$('resetModal').classList.add('show')}function hideResetModal(){$('resetModal').classList.remove('show')}
 function confirmReset(){tasks=[];analysis=null;avail=DEFAULT_AVAIL.slice();ovr={};localStorage.removeItem(K(OVR_KEY));localStorage.removeItem(K(STORAGE_KEY));localStorage.removeItem(K(ANALYSIS_KEY));localStorage.removeItem(K(AVAIL_KEY));hideResetModal();persist();navigate('home');toast('모든 데이터가 초기화되었습니다.')}
@@ -104,7 +144,7 @@ function renderLoad(elId,base){
  const over=days.filter(x=>x.short>0.001),total=over.reduce((a,x)=>a+x.short,0);
  const hasData=tasks.some(t=>t.status!=='완료');
  el.innerHTML=`<div class="card-title"><span>주간 부하</span><span class="tiny">점선 = 내 가용 시간</span></div>
- <div class="load">${days.map(x=>`<div class="load-col ${x.past?'past':''} ${x.k===today?'today':''}"><div class="load-bar"><i class="cap" style="bottom:${x.cap/max*100}%"></i><i class="use" style="height:${x.used/max*100}%"></i><i class="short" style="height:${x.short/max*100}%;bottom:${x.used/max*100}%"></i></div><b class="${x.short>0.001?'bad':''}">${x.short>0.001?'+'+fh(x.short).replace('시간','h'):(x.used?fh(x.used).replace('시간','h'):'-')}</b><span>${x.n}</span></div>`).join('')}</div>
+ <div class="load">${days.map(x=>`<div class="load-col ${x.past?'past':''} ${x.k===today?'today':''}"><div class="load-bar"><i class="cap" style="bottom:${x.cap/max*100}%"></i><i class="use ${tightDay(x)?'tight':''}" style="height:${x.used/max*100}%"></i><i class="short" style="height:${x.short/max*100}%;bottom:${x.used/max*100}%"></i></div><b class="${x.short>0.001?'bad':tightDay(x)?'tight':''}">${x.short>0.001?'+'+fh(x.short).replace('시간','h'):tightDay(x)?'빠듯':(x.used?fh(x.used).replace('시간','h'):'-')}</b><span>${x.n}</span></div>`).join('')}</div>
  <p class="load-msg ${over.length?'bad':''}">${!hasData?'일정을 등록하면 주간 부하가 표시됩니다.':over.length?`⚠ 가용 시간이 부족한 날이 ${over.length}일 있습니다 (합계 +${fh(total)}). 막대 위 빨간 부분은 마감 전까지 배정하지 못한 시간입니다.`:'이 주는 입력한 가용 시간 안에서 소화할 수 있습니다.'}</p>`;
 }
 function renderAvail(){
@@ -123,8 +163,9 @@ function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();markStale();an
 /* ===== v7: 오늘 할 일 · 조정 제안 · 날짜별 가용 시간 · 공지 붙여넣기 · AI 연결 지점 ===== */
 function renderAlloc(){
  const el=$('homeAlloc');if(!el)return;
- const plan=buildPlan(),items=plan.alloc[isoDate(new Date())]||[];
- el.innerHTML=items.length?items.map(x=>`<div class="task"><div class="task-name">${escapeHtml(x.title)}</div><span class="pill">${fh(x.h)}</span></div>`).join('')+`<p class="tiny" style="margin:8px 0 0">마감일부터 거꾸로 가용 시간에 배정한 오늘 몫입니다.</p>`:'<div class="empty">오늘 배정된 작업이 없습니다.</div>';
+ const plan=buildPlan(),items=plan.alloc[isoDate(new Date())]||[],tot=items.reduce((a,x)=>a+x.h,0);
+ $('allocMeta').textContent=items.length?`${items.length}건 · 총 ${hh(tot)}`:'';
+ el.innerHTML=items.length?items.map(x=>{const t=tasks.find(y=>y.id===x.id);if(!t)return '';const d=dday(t),sh=plan.taskShort[x.id];return `<div class="tk" style="--c:${typeColor(t.type)}" onclick="openDetail('${t.id}')" onkeydown="if(event.key==='Enter')openDetail('${t.id}')" role="button" tabindex="0"><div class="ti">${typeIcon(t.type)}</div><div class="tk-main"><b>${escapeHtml(t.title)}</b><small>${escapeHtml(t.type)} · ${sh?'부족 '+hh(sh):'마감 '+fmt(t.date)}</small></div><div class="tk-r"><b class="hrs">${hh(x.h)}</b><span class="dd ${d.cls}">${d.label}</span></div></div>`}).join('')+`<p class="tiny" style="margin:4px 2px 0">마감일부터 거꾸로 가용 시간에 배정한 오늘 몫입니다.</p>`:'<div class="card empty">오늘 배정된 작업이 없습니다.</div>';
 }
 function buildAdvice(plan){
  const today=dateObj(isoDate(new Date()));
@@ -192,7 +233,7 @@ async function getAiComment(){
   text=today.length?`오늘은 ${today.map(a=>`${a.title} ${fh(a.h)}`).join(', ')} 순서로 진행하세요.`:'오늘 배정된 작업이 없습니다.';
   if(adv.length)text+=` 다만 ${adv.map(a=>a.title).join(', ')}은(는) 가용 시간이 부족하니 일정이나 가용 시간을 조정해 보세요.`;
  }
- $('aiComment').innerHTML=`<div class="card"><div class="card-title"><span>AI 코멘트</span><span class="pill">${mode}</span></div><p class="sub" style="margin:0">${escapeHtml(text)}</p></div>`;
+ $('aiComment').innerHTML=`<div class="bubble"><div class="l">AI 코멘트<span>${mode}</span></div><p>${escapeHtml(text)}</p></div>`;
 }
 
 /* ===== 마이 페이지: 이 브라우저 안의 로컬 계정(서버 인증 아님) ===== */
@@ -247,5 +288,5 @@ function deleteAccount(){
  [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY].forEach(k=>localStorage.removeItem(k+'::'+id));
  switchUser('');toast('계정을 삭제했습니다.');
 }
-function init(){persist();renderAvail();$('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다.':'현재는 규칙 기반 Mock으로 추출합니다(AI 서버 미연결).';renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
+function init(){persist();$('fab').hidden=false;renderAvail();$('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다.':'현재는 규칙 기반 Mock으로 추출합니다(AI 서버 미연결).';renderHome();renderSchedule();renderAnalysis();$('fDate').value=isoDate(new Date())}
 init();
