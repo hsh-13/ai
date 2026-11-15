@@ -3,20 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#F3F5FA">
+<meta name="theme-color" content="#3452E1">
 <title>AI 학업 플래너</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="CSS/style.css">
 </head>
 <body>
 
 <main>
-<div class="app-shell" id="shell" data-view="today">
+<div class="app-shell" id="shell" data-view="auth" data-auth="out">
+
+  <!-- 로그인(앱 시작 화면) -->
+  <section class="view" id="view-auth" aria-label="로그인">
+    <div class="auth-hero"><div class="auth-logo"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.7 1.8L21.5 18.5l-1.8.7L19 21l-.7-1.8-1.8-.7 1.8-.7z"/></svg></div><h1>AI 학업 플래너</h1><p>공지를 붙여넣으면 마감일까지 하루 할 일로 나눠 드려요.</p></div>
+    <div class="card auth-card" id="authCard"></div>
+  </section>
 
   <!-- 오늘 -->
-  <section class="view active" id="view-today" aria-labelledby="todayTitle">
+  <section class="view" id="view-today" aria-labelledby="todayTitle">
     <div class="top"><div><div class="eyebrow" id="todayLabel"></div><h1 id="todayTitle">오늘 할 일</h1></div></div>
     <div id="homeSummary"></div>
     <div class="sec"><h2>오늘 할 일</h2><small id="allocMeta"></small></div>
@@ -49,7 +54,7 @@
     <div class="top"><div><div class="eyebrow">내 정보와 저장된 데이터</div><h1 id="myTitle">마이</h1></div></div>
     <div class="card" id="profileCard"></div>
     <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)이에요. 계획과 주간 판단에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
-    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.0</span></div></div>
+    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.2</span></div></div>
     <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 지웁니다. 예시 일정에는 “예시” 표시가 붙어요.</p><div class="row2"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
     <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정·약속·가용 시간을 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
     <div class="card"><h3>약관 및 안내</h3>
@@ -67,7 +72,7 @@
       <h3>2. 서비스 내용</h3><p>일정 등록·관리, 가용 시간 기준 주간 부하 계산, 우선순위 계산, 공지 붙여넣기 일정 추출, 단계 제안, 개인 약속 반영을 제공합니다. 공지 추출과 코멘트는 AI 서버가 연결되면 생성형 AI로, 연결되지 않으면 규칙 기반 Mock으로 처리하며 화면에 어느 쪽인지 표시합니다. 일정 배정, 가용 시간, 우선순위 계산은 항상 규칙(코드)으로 처리합니다.</p>
       <h3>3. 이용자의 책임</h3><p>입력한 일정의 정확성은 이용자가 확인해야 합니다. 이 서비스의 계산 결과는 참고용이므로 실제 마감일과 제출 조건은 직접 확인해 주세요.</p>
       <h3>4. 서비스의 제한</h3><p>프로토타입이므로 예고 없이 기능이 바뀌거나 중단될 수 있습니다. 브라우저 데이터를 삭제하면 저장한 일정이 사라질 수 있습니다.</p>
-      <h3>5. 로그인</h3><p>아이디와 비밀번호로 가입·로그인하는 기능이며, 계정 정보는 이 브라우저에만 저장됩니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없습니다. 비밀번호는 해시로 저장하지만 같은 기기에서 개발자 도구로 저장 데이터를 열어볼 수 있어 보안 기능으로 보호되지 않습니다. 비밀번호를 잊으면 복구할 수 없습니다.</p>
+      <h3>5. 로그인</h3><p>닉네임와 비밀번호로 가입·로그인하는 기능이며, 계정 정보는 이 브라우저에만 저장됩니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없습니다. 비밀번호는 해시로 저장하지만 같은 기기에서 개발자 도구로 저장 데이터를 열어볼 수 있어 보안 기능으로 보호되지 않습니다. 비밀번호를 잊으면 복구할 수 없습니다.</p>
     </div>
   </section>
 
@@ -75,7 +80,7 @@
     <div class="bar"><button class="iconbtn" onclick="navigate('settings')" aria-label="마이로 돌아가기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>개인정보 취급 안내</h2></div>
     <p class="sub pad">이 서비스가 어떤 정보를 어디에 저장하는지 안내합니다.</p>
     <div class="card doc">
-      <h3>저장하는 정보</h3><p>아이디, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태, 요구사항, 단계), 개인 약속(이름, 날짜, 시간), 요일별·날짜별 가용 시간.</p>
+      <h3>저장하는 정보</h3><p>닉네임, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태, 요구사항, 단계), 개인 약속(이름, 날짜, 시간), 요일별·날짜별 가용 시간.</p>
       <h3>저장하지 않는 정보</h3><p>이름, 학번, 학교 계정, 연락처는 받지 않습니다. 이 서비스 전용 비밀번호만 입력받으며 원문은 저장하지 않습니다. 학교 계정 등 다른 서비스의 비밀번호를 재사용하지 마세요.</p>
       <h3>저장 위치</h3><p>이 브라우저의 localStorage에만 저장되며 현재 서버로 전송하지 않습니다.</p>
       <h3>AI 연결 시</h3><p>AI 중계 서버가 연결되면 붙여넣은 공지 텍스트(최대 2,000자)와 일정 요약이 AI 처리를 위해 서버를 거쳐 외부 AI로 전송됩니다. 연결 전에는 전송되지 않습니다. 개인 약속의 내용은 어떤 경우에도 전송하지 않습니다.</p>

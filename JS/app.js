@@ -2,13 +2,22 @@ const STORAGE_KEY='aiStudyPlannerV3Tasks'; // v4 사용자 데이터와 호환 �
 const ANALYSIS_KEY='aiStudyPlannerV3Analysis'; // v4 분석 데이터와 호환 유지
 const AVAIL_KEY='aiStudyPlannerAvail'; // v6: 요일별 가용 시간(월~일, 시간 단위)
 const DEFAULT_AVAIL=[2,2,2,2,2,3,3];
-const USER_KEY='aiStudyPlannerUser'; // 현재 로그인한 아이디(이 브라우저의 세션)
-const ACCOUNTS_KEY='aiStudyPlannerAccounts'; // 이 브라우저의 로컬 계정 {아이디:{salt,hash}}
+const USER_KEY='aiStudyPlannerUser'; // 현재 로그인한 닉네임(이 브라우저의 세션)
+const ACCOUNTS_KEY='aiStudyPlannerAccounts'; // 이 브라우저의 로컬 계정 {닉네임:{salt,hash}}
 const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시간 수정
 const APPT_KEY='aiStudyPlannerAppts'; // v3.0: 개인 약속 [{id,title,date,start,end}] — 가용 시간 계산에만 쓰고 AI로 보내지 않는다
 const MAX_NOTICE=2000, AI_TIMEOUT_MS=10000; // v3.0: 공지 입력 길이 제한, AI 응답 대기 한도
 // v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
 const AI_ENDPOINT='';
+// v3.2: 저장소는 이 객체 한곳으로 모은다(localStorage). 구글 시트 연동 때는 이 객체의 구현만 서버 호출로 바꾸고, 화면·계산 코드는 건드리지 않는다.
+const Store={
+ get(base){try{return JSON.parse(localStorage.getItem(K(base)))}catch(e){return null}},          // 현재 계정의 데이터 읽기
+ set(base,v){localStorage.setItem(K(base),JSON.stringify(v))},                                   // 현재 계정의 데이터 쓰기
+ del(base){localStorage.removeItem(K(base))},                                                    // 현재 계정의 데이터 삭제
+ delFor(base,id){localStorage.removeItem(base+'::'+id)},                                         // 지정한 계정의 데이터 삭제(계정 삭제용)
+ session:{get(){try{return localStorage.getItem(USER_KEY)||''}catch(e){return ''}},set(id){try{id?localStorage.setItem(USER_KEY,id):localStorage.removeItem(USER_KEY)}catch(e){}}},
+ accounts:{get(){try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY))||{}}catch(e){return {}}},set(a){localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(a))}}
+};
 let user=loadUser(), authMode='login', tasks=loadTasks(), avail=loadAvail(), ovr=loadOvr(), appts=loadAppts(), draft=null, extractCtl=null, lastNotice='', formTab='direct', currentView='today', lastMain='today', selectedDate=isoDate(new Date()), weekStart=isoDate(startOfWeek(new Date())), editingId=null, listFilter='전체', listSort='due', pasteState='input', commentCache=null;
 const esc=s=>escapeHtml(s);
 const CHK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -17,14 +26,14 @@ const STATE_LABEL={ok:'여유',tight:'빠듯',bad:'부족',none:'일정 없음'}
 const STATE_COLOR={ok:'var(--c-ok)',tight:'var(--c-tight)',bad:'var(--c-bad)',none:'var(--c-none)'};
 const $=id=>document.getElementById(id);
 function K(base){return user?base+'::'+user:base} // 로그인하면 계정별 키, 로그인 전은 기존 키
-function loadTasks(){try{return JSON.parse(localStorage.getItem(K(STORAGE_KEY)))||[]}catch(e){return []}}
-function loadAnalysis(){try{return JSON.parse(localStorage.getItem(K(ANALYSIS_KEY)))}catch(e){return null}}
-function loadAvail(){try{const a=JSON.parse(localStorage.getItem(K(AVAIL_KEY)));return Array.isArray(a)&&a.length===7?a.map(Number):DEFAULT_AVAIL.slice()}catch(e){return DEFAULT_AVAIL.slice()}}
-function loadUser(){try{return localStorage.getItem(USER_KEY)||''}catch(e){return ''}}
-function loadAppts(){try{const a=JSON.parse(localStorage.getItem(K(APPT_KEY)));return Array.isArray(a)?a:[]}catch(e){return []}}
-function persistAppts(){localStorage.setItem(K(APPT_KEY),JSON.stringify(appts))}
-function loadOvr(){try{return JSON.parse(localStorage.getItem(K(OVR_KEY)))||{}}catch(e){return {}}}
-function persist(){commentCache=null;localStorage.setItem(K(STORAGE_KEY),JSON.stringify(tasks));$('settingsCount').textContent=tasks.length+'개'}
+function loadTasks(){try{return Store.get(STORAGE_KEY)||[]}catch(e){return []}}
+function loadAnalysis(){try{return Store.get(ANALYSIS_KEY)}catch(e){return null}}
+function loadAvail(){try{const a=Store.get(AVAIL_KEY);return Array.isArray(a)&&a.length===7?a.map(Number):DEFAULT_AVAIL.slice()}catch(e){return DEFAULT_AVAIL.slice()}}
+function loadUser(){return Store.session.get()}
+function loadAppts(){try{const a=Store.get(APPT_KEY);return Array.isArray(a)?a:[]}catch(e){return []}}
+function persistAppts(){Store.set(APPT_KEY,appts)}
+function loadOvr(){try{return Store.get(OVR_KEY)||{}}catch(e){return {}}}
+function persist(){commentCache=null;if(user)Store.set(STORAGE_KEY,tasks);$('settingsCount').textContent=tasks.length+'개'}
 function isoDate(d){const x=new Date(d);return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`}
 function dateObj(s){return new Date(s+'T12:00:00')}
 function fmt(s){if(!s)return '-';const d=dateObj(s);return `${d.getFullYear()}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getDate()).padStart(2,'0')}`}
@@ -40,13 +49,15 @@ function renderView(v){
  else if(v==='list')renderList();
  else if(v==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile()}
  else if(v==='detail')renderDetail();
+ else if(v==='auth')renderAuth();
 }
 function navigate(view){
  if(view==='home')view='today';
+ if(!user&&view!=='auth'&&view!=='terms'&&view!=='privacy')view='auth'; // v3.1: 로그인 전에는 로그인 화면만 연다
  currentView=view;if(MAIN.includes(view))lastMain=view;
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));
  document.querySelectorAll('[data-nav]').forEach(b=>{const on=b.dataset.nav===NAV_OF[view];b.classList.toggle('active',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
- $('shell').dataset.view=view;closeSheet();renderView(view);window.scrollTo(0,0);
+ $('shell').dataset.view=view;$('shell').dataset.auth=user?'in':'out';closeSheet();renderView(view);window.scrollTo(0,0);
 }
 function refresh(){renderView(currentView)}
 function goBack(){navigate(lastMain)}
@@ -69,8 +80,12 @@ function weekDays(base,plan){
   x.state=x.short>0.001?'bad':tightDay(x)?'tight':(x.used>0?'ok':'none');return x});
 }
 function loadBars(days,h){
+ // v3.1: 막대 위에 시간 숫자, 막대 뒤에 연한 트랙, 검은 실선이 내 가용 시간. 범례를 함께 그린다.
  const max=Math.max(4,...days.map(x=>Math.max(x.cap,x.used+x.short)));
- return `<div class="lb">${days.map(x=>{const tot=x.used+x.short,bh=tot>0?Math.max(4,tot/max*h):0;return `<div class="lb-c ${x.past?'past':''} ${x.today?'today':''}" role="img" aria-label="${x.n}요일 가용 ${hh(x.cap)}, 배정 ${hh(tot)}, ${STATE_LABEL[x.state]}"><div class="lb-b" style="height:${h}px"><i class="lb-cap" style="bottom:${(x.cap/max*h).toFixed(0)}px"></i><i class="lb-u" style="height:${bh.toFixed(0)}px;background:${STATE_COLOR[x.state]}"></i></div><span>${x.n}</span></div>`}).join('')}</div>`;
+ const cols=days.map(x=>{
+  const tot=x.used+x.short,fh=tot>0?Math.max(6,tot/max*h):0,ch=x.cap/max*h;
+  return `<div class="lb-c ${x.past?'past':''} ${x.today?'today':''}" role="img" aria-label="${x.n}요일 가용 ${hh(x.cap)}, 배정 ${hh(tot)}, ${STATE_LABEL[x.state]}"><span class="lb-v ${x.state}">${tot>0?hh(tot):'–'}</span><div class="lb-b" style="height:${h}px">${x.cap>0?`<i class="lb-cap" style="bottom:${ch.toFixed(0)}px"></i>`:''}<i class="lb-f ${x.state}" style="height:${fh.toFixed(0)}px"></i></div><span class="lb-d">${x.n}</span></div>`}).join('');
+ return `<div class="lb">${cols}</div><div class="lb-leg"><span><i class="k fill"></i>배정 시간</span><span><i class="k cap"></i>내 가용 시간</span></div>`;
 }
 function hh(x){return (Math.round(x*10)/10)+'h'}
 function tightDay(x){return x.cap>0&&x.short<=0.001&&x.used/x.cap>=.9}
@@ -123,7 +138,7 @@ function renderSummary(plan){
   if(!keys.length&&later.length)desc+=` 이후 마감인 ${dayWord(later[0])} 일정에서는 ${hh(plan.short[later[0]])}가 부족해요.`;
  }
  const tg={ok:'good',tight:'warn',bad:'bad',none:'rule'}[st];
- el.innerHTML=`<div class="card sum"><div class="row" style="margin-bottom:8px"><span class="tag ${tg}">${title}</span><span class="tag rule">규칙</span><div class="grow"></div>${active?`<span class="num pct">${Math.round(ratio*100)}<small>%</small></span>`:''}</div><div class="d">${desc}</div>${active?loadBars(days,44):''}</div>`;
+ el.innerHTML=`<div class="card sum"><div class="row" style="margin-bottom:8px"><span class="tag ${tg}">${title}</span><span class="tag rule">규칙</span><div class="grow"></div>${active?`<span class="num pct">${Math.round(ratio*100)}<small>%</small></span>`:''}</div><div class="d">${desc}</div>${active?loadBars(days,92):''}</div>`;
 }
 function dayWord(k){const d=Math.round((dateObj(k)-dateObj(todayKey()))/86400000);if(d<=0)return '오늘';if(d===1)return '내일';if(d<7)return DAY_NAMES[(dateObj(k).getDay()+6)%7]+'요일';const x=dateObj(k);return `${x.getMonth()+1}/${x.getDate()}`}
 // 코멘트: 서버가 연결되면 AI, 아니면 규칙 문장. 어느 쪽인지 태그로 구분해서 보여준다.
@@ -183,7 +198,7 @@ function renderLoad(elId,base,plan,days){
  const el=$(elId);if(!el)return;
  plan=plan||buildPlan();days=days||weekDays(base,plan);
  const over=days.filter(x=>x.short>0.001),total=over.reduce((a,x)=>a+x.short,0),has=tasks.some(t=>t.status!=='완료');
- el.innerHTML=`<div class="row" style="margin-bottom:12px"><div class="lbl grow">주간 부하</div><span class="small muted">점선 = 가용 시간</span></div>${loadBars(days,84)}<p class="lw ${over.length?'bad':''}">${!has?'일정을 등록하면 주간 부하가 표시돼요.':over.length?`가용 시간이 부족한 날이 ${over.length}일 있어요(합계 ${hh(total)}). 빨간 막대는 마감 전까지 배정하지 못한 시간이 있는 날이에요.`:'이 주는 입력한 가용 시간 안에서 소화할 수 있어요.'}</p>`;
+ el.innerHTML=`<div class="row" style="margin-bottom:12px"><div class="lbl grow">주간 부하</div></div>${loadBars(days,100)}<p class="lw ${over.length?'bad':''}">${!has?'일정을 등록하면 주간 부하가 표시돼요.':over.length?`가용 시간이 부족한 날이 ${over.length}일 있어요(합계 ${hh(total)}). 빨간 막대는 마감 전까지 배정하지 못한 시간이 있는 날이에요.`:'이 주는 입력한 가용 시간 안에서 소화할 수 있어요.'}</p>`;
 }
 
 /* ===== 일정 목록: 필터 · 정렬 · 우선순위(규칙) ===== */
@@ -332,20 +347,20 @@ function seedSample(){
 function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();refresh();toast('예시 데이터를 삭제했어요.')}
 function confirmReset(){
  tasks=[];avail=DEFAULT_AVAIL.slice();ovr={};appts=[];commentCache=null;
- [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>localStorage.removeItem(K(k)));
+ [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.del(k));
  hideResetModal();persist();navigate('today');toast('모든 데이터가 초기화되었어요.');
 }
 function switchUser(id){
- user=id;try{id?localStorage.setItem(USER_KEY,id):localStorage.removeItem(USER_KEY)}catch(e){}
+ user=id;Store.session.set(id);
  authMode='login';tasks=loadTasks();avail=loadAvail();ovr=loadOvr();appts=loadAppts();commentCache=null;
- persist();navigate('settings');
+ persist();navigate(id?'today':'auth');
 }
 function init(){
  persist();renderAvail();
  $('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다. 실패하면 결과를 쓰지 않고 대체 방법을 안내해요.':'현재는 규칙 기반 Mock으로 추출해요(AI 서버 미연결). 결과에 “규칙 기반”으로 표시됩니다.';
  $('noticePrivacy').textContent=AI_ENDPOINT?'붙여넣은 공지(최대 2,000자)는 중계 서버(Google Apps Script)를 거쳐 외부 AI로 전송돼요. 이름·학번·연락처 등 개인정보는 지우고 붙여넣어 주세요.':'AI 서버가 연결되어 있지 않아 공지가 외부로 전송되지 않아요. 연결되면 전송되며, 그때 이 안내와 개인정보 취급 안내가 바뀝니다.';
  const t=new Date();$('noticeToday').textContent=`계산 기준일: ${fmt(isoDate(t))}(${DAY_NAMES[(t.getDay()+6)%7]}) — “다음 주 금요일” 같은 표현은 이 날짜를 기준으로 코드가 계산해요.`;
- updateNoticeCount();renderStepper('input');$('fDate').value=todayKey();renderView('today');
+ updateNoticeCount();renderStepper('input');$('fDate').value=todayKey();navigate(user?'today':'auth');
 }
 function openSheet(){$('sheet').classList.add('show');document.querySelector('#sheet .sheet-item').focus()}
 function closeSheet(){const el=$('sheet');if(el)el.classList.remove('show')}
@@ -386,7 +401,7 @@ function buildPlan(){
 function renderAvail(){
  $('availGrid').innerHTML=DAY_NAMES.map((n,i)=>`<label class="avail"><span>${n}</span><input type="number" min="0" max="16" step="0.5" value="${avail[i]}" onchange="setAvail(${i},this.value)"></label>`).join('');
 }
-function setAvail(i,v){const n=Math.min(16,Math.max(0,Number(v)||0));avail[i]=n;localStorage.setItem(K(AVAIL_KEY),JSON.stringify(avail));renderAvail();toast('가용 시간이 저장되었습니다.')}
+function setAvail(i,v){const n=Math.min(16,Math.max(0,Number(v)||0));avail[i]=n;Store.set(AVAIL_KEY,avail);renderAvail();toast('가용 시간이 저장되었습니다.')}
 function buildAdvice(plan){
  const today=dateObj(isoDate(new Date()));
  return tasks.filter(t=>plan.taskShort[t.id]).map(t=>{
@@ -401,7 +416,7 @@ function updateApptPreview(){
  const d=dateObj(date),k=isoDate(d),add=(toMin(en)-toMin(st))/60,before=availOn(d),has=ovr[k]!==undefined,after=has?before:Math.max(0,baseAvail(d)-apptHours(k)-add);
  el.innerHTML=`<div class="card-title"><span>이 날 가용 시간 변화</span><span class="tag rule">규칙</span></div><div class="calcrow">${hh(before)} → <b>${hh(after)}</b> <small>(약속 ${hh(add)} 반영)</small></div>${has?'<p class="tiny" style="margin:6px 0 0">이 날은 직접 수정한 가용 시간이 있어 약속을 추가해도 값이 바뀌지 않습니다.</p>':''}`;
 }
-function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}localStorage.setItem(K(OVR_KEY),JSON.stringify(ovr));commentCache=null;renderPlan();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
+function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}Store.set(OVR_KEY,ovr);commentCache=null;renderPlan();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
 // ---- AI 연결 지점: 엔드포인트가 있으면 중계 서버로, 없으면 규칙 기반 Mock으로 처리 ----
 async function aiCall(task,payload,signal){
  if(!AI_ENDPOINT)return null;
@@ -535,8 +550,8 @@ function toSteps(){
 function toggleDraftStep(i){draft.steps[i].on=!draft.steps[i].on;renderStepsPanel()}
 function adjDraftStep(i,dv){const s=draft.steps[i];s.h=Math.min(12,Math.max(.5,s.h+dv));renderStepsPanel()}
 /* ===== 마이 페이지: 이 브라우저 안의 로컬 계정(서버 인증 아님) ===== */
-function getAccounts(){try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY))||{}}catch(e){return {}}}
-function setAccounts(a){localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(a))}
+function getAccounts(){return Store.accounts.get()}
+function setAccounts(a){Store.accounts.set(a)}
 async function hashPw(salt,pw){
  if(!(window.crypto&&crypto.subtle))throw new Error('nocrypto');
  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+':'+pw));
@@ -544,32 +559,35 @@ async function hashPw(salt,pw){
 }
 function newSalt(){return Array.from(crypto.getRandomValues(new Uint8Array(8))).map(x=>x.toString(16).padStart(2,'0')).join('')}
 function renderProfile(){
- const el=$('profileCard');if(!el)return;
- if(user){
-  el.innerHTML=`<div class="card-title"><span>내 계정</span><span class="pill">로그인됨</span></div><p class="profile-name">${escapeHtml(user)}</p><p class="tiny" style="margin:0 0 12px">일정·가용 시간·분석 결과가 이 아이디로 따로 저장됩니다. 이 브라우저 안의 로컬 계정이며 서버 인증이 아닙니다.</p><button class="btn full" style="margin-top:0" onclick="logout()">로그아웃</button><button class="btn full danger-text" onclick="deleteAccount()">계정 삭제</button>`;
-  return;
- }
+ const el=$('profileCard');if(!el||!user)return;
+ el.innerHTML=`<div class="card-title"><span>내 계정</span><span class="pill">로그인됨</span></div><p class="profile-name">${escapeHtml(user)}</p><p class="tiny" style="margin:0 0 12px">일정·가용 시간·분석 결과가 이 닉네임으로 따로 저장됩니다. 이 브라우저 안의 로컬 계정이며 서버 인증이 아닙니다.</p><button class="btn full" style="margin-top:0" onclick="logout()">로그아웃</button><button class="btn full danger-text" onclick="deleteAccount()">계정 삭제</button>`;
+}
+// v3.1: 앱은 로그인 화면에서 시작한다. 닉네임 + 비밀번호, 계정마다 localStorage 키를 따로 쓴다.
+function setAuthMode(m){authMode=m;renderAuth()}
+function renderAuth(){
+ const el=$('authCard');if(!el)return;
  const su=authMode==='signup';
- el.innerHTML=`<div class="card-title"><span>${su?'회원가입':'로그인'}</span><span class="pill">로그인 전</span></div>
- <div class="field" style="margin:0 0 10px"><label>아이디 (영문 소문자·숫자·_ 4~16자)</label><input id="authId" maxlength="16" autocomplete="username" autocapitalize="off"></div>
- <div class="field" style="margin:0 0 10px"><label>비밀번호 (6자 이상)</label><input id="authPw" type="password" autocomplete="${su?'new-password':'current-password'}" ${su?'':'onkeydown="if(event.key===\'Enter\')submitAuth()"'}></div>
- ${su?'<div class="field" style="margin:0 0 10px"><label>비밀번호 확인</label><input id="authPw2" type="password" autocomplete="new-password" onkeydown="if(event.key===\'Enter\')submitAuth()"></div>':''}
- <button class="btn primary full" style="margin-top:0" onclick="submitAuth()">${su?'가입하고 로그인':'로그인'}</button>
- <button class="btn full" onclick="authMode='${su?'login':'signup'}';renderProfile()">${su?'이미 계정이 있어요':'회원가입'}</button>
- <p class="tiny" style="margin:9px 0 0">이 브라우저 안에서만 동작하는 계정입니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없으며, 비밀번호를 잊으면 찾을 수 없습니다. 로그인 전에 입력한 일정은 로그인한 계정에서 보이지 않습니다(로그아웃하면 다시 보입니다).</p>`;
+ el.innerHTML=`<h2 class="auth-h">${su?'회원가입':'로그인'}</h2>
+ <div class="field" style="margin:0 0 12px"><label for="authId">닉네임${su?' <small>(한글·영문·숫자·_ 2~12자)</small>':''}</label><input id="authId" maxlength="16" autocomplete="username" autocapitalize="off" placeholder="닉네임" onkeydown="if(event.key==='Enter')$('authPw').focus()"></div>
+ <div class="field" style="margin:0 0 12px"><label for="authPw">비밀번호${su?' <small>(6자 이상)</small>':''}</label><input id="authPw" type="password" autocomplete="${su?'new-password':'current-password'}" placeholder="비밀번호" ${su?'onkeydown="if(event.key===\'Enter\')$(\'authPw2\').focus()"':'onkeydown="if(event.key===\'Enter\')submitAuth()"'}></div>
+ ${su?'<div class="field" style="margin:0 0 12px"><label for="authPw2">비밀번호 확인</label><input id="authPw2" type="password" autocomplete="new-password" placeholder="비밀번호 확인" onkeydown="if(event.key===\'Enter\')submitAuth()"></div>':''}
+ <button class="btn primary full" style="margin-top:4px" onclick="submitAuth()">${su?'가입하고 시작하기':'로그인'}</button>
+ <button class="btn full" onclick="setAuthMode('${su?'login':'signup'}')">${su?'이미 계정이 있어요':'처음이에요, 회원가입'}</button>
+ <p class="tiny" style="margin:12px 0 0">계정과 일정은 이 브라우저 안에만 저장돼요. 서버에 계정이 만들어지지 않아 다른 기기에서는 쓸 수 없고, 비밀번호를 잊으면 찾을 수 없어요.</p>
+ <div class="auth-links"><button onclick="navigate('terms')">이용 약관</button><button onclick="navigate('privacy')">개인정보 안내</button></div>`;
 }
 async function submitAuth(){
  const id=($('authId').value||'').trim().toLowerCase(),pw=$('authPw').value||'';
- if(!/^[a-z0-9_]{4,16}$/.test(id)){toast('아이디는 영문 소문자·숫자·_ 4~16자로 입력해 주세요.');return}
+ if(authMode==='signup'?!/^[가-힣a-z0-9_]{2,12}$/.test(id):!id){toast(authMode==='signup'?'닉네임은 한글·영문·숫자·_ 2~12자로 입력해 주세요.':'닉네임을 입력해 주세요.');return}
  if(pw.length<6){toast('비밀번호는 6자 이상 입력해 주세요.');return}
  const acc=getAccounts();
  try{
   if(authMode==='signup'){
    if(pw!==$('authPw2').value){toast('비밀번호 확인이 일치하지 않습니다.');return}
-   if(acc[id]){toast('이미 있는 아이디입니다.');return}
+   if(acc[id]){toast('이미 사용 중인 닉네임입니다.');return}
    const salt=newSalt();acc[id]={salt,hash:await hashPw(salt,pw)};setAccounts(acc);
   }else{
-   if(!acc[id]||acc[id].hash!==await hashPw(acc[id].salt,pw)){toast('아이디 또는 비밀번호가 올바르지 않습니다.');return}
+   if(!acc[id]||acc[id].hash!==await hashPw(acc[id].salt,pw)){toast('닉네임 또는 비밀번호가 올바르지 않습니다.');return}
   }
  }catch(e){toast(e.message==='nocrypto'?'이 환경에서는 로그인 기능을 쓸 수 없습니다(HTTPS 필요).':'처리 중 오류가 발생했습니다.');return}
  const wasSignup=authMode==='signup';switchUser(id);toast(`${id}님, ${wasSignup?'가입 후 ':''}로그인했습니다.`);
@@ -578,7 +596,7 @@ function logout(){switchUser('');toast('로그아웃했습니다. 계정 데이�
 function deleteAccount(){
  if(!user||!confirm(`계정 "${user}"와 이 계정의 일정·설정·분석 결과를 삭제합니다. 되돌릴 수 없습니다.`))return;
  const id=user,acc=getAccounts();delete acc[id];setAccounts(acc);
- [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>localStorage.removeItem(k+'::'+id));
+ [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.delFor(k,id));
  switchUser('');toast('계정을 삭제했습니다.');
 }
 init();
