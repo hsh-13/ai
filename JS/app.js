@@ -50,10 +50,11 @@ function renderView(v){
  else if(v==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile()}
  else if(v==='detail')renderDetail();
  else if(v==='auth')renderAuth();
+ else if(v==='intro')renderIntro();
 }
 function navigate(view){
  if(view==='home')view='today';
- if(!user&&view!=='auth'&&view!=='terms'&&view!=='privacy')view='auth'; // v3.1: 로그인 전에는 로그인 화면만 연다
+ if(!user&&view!=='auth'&&view!=='intro'&&view!=='terms'&&view!=='privacy')view='auth'; // v3.1: 로그인 전에는 로그인 화면만 연다
  currentView=view;if(MAIN.includes(view))lastMain=view;
  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+view));
  document.querySelectorAll('[data-nav]').forEach(b=>{const on=b.dataset.nav===NAV_OF[view];b.classList.toggle('active',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});
@@ -226,9 +227,12 @@ function renderList(){
  $('listMeta').textContent=`진행 중 ${active.length}개 · 완료 ${tasks.length-active.length}개`;
  $('listItems').innerHTML=list.length?list.map(t=>listCard(t,pm,plan)).join(''):`<div class="card empty">${tasks.length?'이 조건에 맞는 일정이 없어요.':'등록된 일정이 없어요.<br>아래 ＋ 버튼으로 추가해 보세요.'}</div>`;
 }
+let openCardId=null; // v3.5: 일정 카드는 접어 두고, 누르면 펼쳐서 나머지 정보를 보여 준다
+function toggleCard(id){openCardId=openCardId===id?null:id;renderList()}
 function listCard(t,pm,plan){
- const d=dday(t),p=pm[t.id],sh=plan.taskShort[t.id],x=dateObj(t.date),c=typeColor(t.type),n=t.steps?t.steps.length:0,dn=n?t.steps.filter(s=>s.done).length:0;
- return `<button class="lc ${t.status==='완료'?'done':''}" onclick="openDetail('${t.id}')"><div class="row"><div class="grow"><div class="ttl">${esc(t.title)}${t.sample?' <span class="pill sample">예시</span>':''}</div><div class="sub2"><i class="dot" style="background:${c}"></i>${esc(t.type)} · 마감 ${x.getMonth()+1}/${x.getDate()}${n?` · ${dn}/${n} 단계`:''}</div></div><span class="dday ${d.cls}">${d.label}</span></div>${n?`<div class="progress" aria-hidden="true"><i style="width:${Math.round(dn/n*100)}%"></i></div>`:''}${(p||sh)?`<div class="tags">${p?`<span class="tag acc">우선순위 ${p.rank}</span><span class="tag rule">규칙</span>`:''}${sh?`<span class="tag bad">${hh(sh)} 부족</span>`:''}</div>`:''}</button>`;
+ const d=dday(t),p=pm[t.id],sh=plan.taskShort[t.id],x=dateObj(t.date),c=typeColor(t.type),n=t.steps?t.steps.length:0,dn=n?t.steps.filter(s=>s.done).length:0,open=openCardId===t.id;
+ const kv=(k,v)=>`<div class="kv"><span>${k}</span><b>${v}</b></div>`;
+ return `<div class="lc ${open?'open':''} ${t.status==='완료'?'done':''}"><button class="lc-h" onclick="toggleCard('${t.id}')" aria-expanded="${open}"><i class="dot" style="background:${c}" aria-hidden="true"></i><span class="ttl grow">${esc(t.title)}${t.sample?' <span class="pill sample">예시</span>':''}</span><span class="dday ${d.cls}">${d.label}</span><svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5"/></svg></button>${dn?`<div class="progress" aria-hidden="true"><i style="width:${Math.round(dn/n*100)}%"></i></div>`:''}${sh?`<div class="tags"><span class="tag bad">${hh(sh)} 부족</span></div>`:''}${open?`<div class="lc-x">${kv('종류',esc(t.type))}${kv('마감',`${x.getMonth()+1}월 ${x.getDate()}일 (${DAY_NAMES[(x.getDay()+6)%7]})`)}${n?kv('단계',`${dn} / ${n} 완료`):''}${p?kv('우선순위',`${p.rank}위`):''}<button class="btn full" onclick="openDetail('${t.id}')">자세히 보기</button></div>`:''}</div>`;
 }
 
 /* ===== 일정 상세 ===== */
@@ -350,6 +354,63 @@ function confirmReset(){
  [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.del(k));
  hideResetModal();persist();navigate('today');toast('모든 데이터가 초기화되었어요.');
 }
+/* ===== v3.4: 서비스 소개(처음 방문할 때만, 건너뛰기 가능) ===== */
+const INTRO_KEY='aiStudyPlannerIntroSeen';
+let introIdx=0;
+function introSeen(){try{return localStorage.getItem(INTRO_KEY)==='1'}catch(e){return true}} // 저장소를 못 쓰면 소개를 반복해서 보이지 않게 건너뛴다
+function openIntro(){introIdx=0;navigate('intro')}
+function finishIntro(){try{localStorage.setItem(INTRO_KEY,'1')}catch(e){}navigate(user?'today':'auth')}
+function introNext(d){introIdx=Math.max(0,Math.min(INTRO_SLIDES().length-1,introIdx+d));renderIntro()}
+function INTRO_SLIDES(){return [
+ {t:'먼저 가용 시간을 정해요',p:'마이 탭에서 요일마다 입력해요'},
+ {t:'일정은 + 버튼으로 넣어요',p:'세 가지 중 편한 방법으로 추가해요'},
+ {t:'오늘 할 일과 계획을 봐요',p:'여유·빠듯·부족으로 바로 알려 줘요'},
+ {t:'“규칙” 표시는 이런 뜻이에요',p:'규칙은 코드가 계산한 값, AI는 AI가 쓴 글이에요',n:AI_ENDPOINT?'':'지금은 AI 미연결이라 규칙으로 처리해요'}
+]}
+function INTRO_ART(i){
+ const T=(x,y,s,t,w,c,a)=>`<text x="${x}" y="${y}" font-size="${s}" font-weight="${w||600}" fill="${c||'var(--ink)'}" text-anchor="${a||'start'}">${t}</text>`;
+ const box=(x,y,w,h,r,f,s)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${f||'#fff'}" stroke="${s||'var(--line)'}" stroke-width="1.5"/>`;
+ let g='';
+ if(i===0){ // 요일별 가용 시간 입력
+  const d=['월','화','수','목','금','토','일'],v=[2,2,2,2,2,3,3];
+  d.forEach((n,k)=>{const x=20+k*40;g+=T(x+17,26,13,n,700,'var(--muted)','middle')+box(x,36,34,44,10,'#fff',k===2?'var(--accent)':'var(--line)')+T(x+17,65,17,v[k],800,k===2?'var(--accent)':'var(--ink)','middle')});
+  g+='<circle cx="94" cy="106" r="9" fill="none" stroke="var(--accent)" stroke-width="2"/><path d="M94 100v6l4 2" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>'+T(110,111,13,'하루에 공부할 수 있는 시간(h)',700,'var(--muted)');
+ }else if(i===1){ // 추가 버튼 → 3가지 방법
+  g+='<circle cx="48" cy="65" r="28" fill="var(--accent)"/><path d="M48 51v28M34 65h28" stroke="#fff" stroke-width="5" stroke-linecap="round"/>'+T(48,114,13,'추가',800,'var(--accent)','middle');
+  g+='<path d="M86 65h14m-5-5l5 5-5 5" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  const rows=[['공지 붙여넣기','<rect x="-6" y="-7" width="12" height="14" rx="2" fill="none" stroke="var(--accent)" stroke-width="1.8"/><path d="M-3 -2h6M-3 2h6" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round"/>'],['직접 입력','<path d="M-6 6l1-4 8-8 3 3-8 8z" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linejoin="round"/>'],['개인 약속','<circle r="7" fill="none" stroke="var(--accent)" stroke-width="1.8"/><path d="M0 -3v3l3 2" fill="none" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/>']];
+  rows.forEach((r,k)=>{const y=12+k*40;g+=box(112,y,198,34,12)+`<circle cx="134" cy="${y+17}" r="12" fill="var(--accent-soft)"/><g transform="translate(134 ${y+17})">${r[1]}</g>`+T(154,y+22,14,r[0],700)});
+ }else if(i===2){ // 오늘 / 계획 / 일정
+  const cards=[['오늘',10],['계획',112],['일정',214]];
+  cards.forEach(([n,x])=>{g+=box(x,10,96,100,14)+T(x+48,32,13,n,800,'var(--accent)','middle')});
+  // 오늘: 체크리스트
+  [52,76].forEach((y,k)=>{g+=`<circle cx="${28}" cy="${y}" r="7" fill="${k?'none':'var(--c-ok)'}" stroke="${k?'var(--line)':'var(--c-ok)'}" stroke-width="1.6"/>`+(k?'':`<path d="M25 ${y}l2.5 2.5 4-5" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>`)+`<rect x="40" y="${y-3}" width="${k?44:52}" height="6" rx="3" fill="var(--line)"/>`});
+  g+=T(58,100,11,'7일 판단',700,'var(--muted)','middle');
+  // 계획: 요일 점
+  ['var(--c-ok)','var(--c-tight)','var(--c-tight)','var(--c-bad)','var(--c-ok)','var(--c-tight)','var(--c-tight)'].forEach((c,k)=>{g+=`<circle cx="${124+k*11}" cy="56" r="4.5" fill="${c}"/>`});
+  g+=box(122,70,72,22,8,'var(--bg)')+T(158,85,11,'가용·배정·부족',700,'var(--muted)','middle');
+  // 일정: 우선순위
+  [48,74].forEach((y,k)=>{g+=`<rect x="226" y="${y-9}" width="18" height="18" rx="6" fill="var(--accent-soft)"/>`+T(235,y+4,11,k+1,800,'var(--accent)','middle')+`<rect x="250" y="${y-3}" width="${k?30:40}" height="6" rx="3" fill="var(--line)"/>`});
+  g+=T(262,100,11,'우선순위',700,'var(--muted)','middle');
+  g+=T(58,126,12,'체크',700,'var(--muted)','middle')+T(160,126,12,'날짜별 확인',700,'var(--muted)','middle')+T(262,126,12,'전체 목록',700,'var(--muted)','middle');
+ }else{ // 규칙 vs AI
+  g+=box(10,10,146,110,16)+box(164,10,146,110,16);
+  g+='<rect x="22" y="22" width="48" height="24" rx="12" fill="#fff" stroke="var(--line)" stroke-width="1.5"/>'+T(46,39,13,'규칙',800,'var(--muted)','middle');
+  g+=T(24,84,32,'116%',800)+T(24,106,12,'코드가 계산한 값',700,'var(--muted)');
+  g+='<rect x="176" y="22" width="48" height="24" rx="12" fill="var(--accent)"/><path d="M190 28l1.6 4.4L196 34l-4.4 1.6L190 40l-1.6-4.4L184 34l4.4-1.6z" fill="#fff" transform="translate(2 0)"/>'+T(209,39,13,'AI',800,'#fff','middle');
+  [64,78,92].forEach((y,k)=>{g+=`<rect x="176" y="${y}" width="${k===2?64:118}" height="7" rx="3.5" fill="var(--line)"/>`});
+  g+=T(176,112,12,'AI가 쓴 문장',700,'var(--muted)');
+ }
+ return `<svg viewBox="0 0 320 ${i===2?132:130}" role="img" aria-hidden="true" font-family="inherit">${g}</svg>`;
+}
+function renderIntro(){
+ const el=$('introCard');if(!el)return;
+ const S=INTRO_SLIDES(),s=S[introIdx],last=introIdx===S.length-1;
+ el.innerHTML=`<div class="intro-hero"><div class="intro-step">${introIdx+1} / ${S.length}</div><h1>${esc(s.t)}</h1></div>
+ <div class="card intro-body"><div class="intro-art">${INTRO_ART(introIdx)}</div><p class="intro-p">${esc(s.p)}</p>${s.n?`<p class="intro-n">${esc(s.n)}</p>`:''}
+ <div class="intro-dots" aria-hidden="true">${S.map((_,i)=>`<i class="${i===introIdx?'on':''}"></i>`).join('')}</div>
+ <div class="row" style="gap:10px">${introIdx>0?'<button class="btn" onclick="introNext(-1)">이전</button>':''}<button class="btn primary grow" onclick="${last?'finishIntro()':'introNext(1)'}">${last?'시작하기':'다음'}</button></div></div>`;
+}
 /* ===== v3.3: 서버(구글 시트) 동기화 — AI_ENDPOINT가 있을 때만 켜진다. 비어 있으면 v3.2처럼 이 브라우저에만 저장한다 ===== */
 const TOKEN_KEY='aiStudyPlannerToken',SYNCMETA_KEY='aiStudyPlannerSync';
 const SYNC_ERR={invalid_nick:'닉네임은 한글·영문·숫자·_ 2~12자로 입력해 주세요.',invalid_pw:'비밀번호는 6~64자로 입력해 주세요.',nick_taken:'이미 사용 중인 닉네임입니다.',bad_credentials:'닉네임 또는 비밀번호가 올바르지 않습니다.',locked:'로그인에 여러 번 실패해 10분간 잠겼어요. 잠시 뒤 다시 시도해 주세요.',rate_limited:'요청이 너무 많아요. 잠시 뒤 다시 시도해 주세요.',busy:'서버가 바빠요. 잠시 뒤 다시 시도해 주세요.'};
@@ -458,7 +519,7 @@ function init(){
  $('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다. 실패하면 결과를 쓰지 않고 대체 방법을 안내해요.':'현재는 규칙 기반 Mock으로 추출해요(AI 서버 미연결). 결과에 “규칙 기반”으로 표시됩니다.';
  $('noticePrivacy').textContent=AI_ENDPOINT?'붙여넣은 공지(최대 2,000자)는 중계 서버(Google Apps Script)를 거쳐 외부 AI로 전송돼요. 이름·학번·연락처 등 개인정보는 지우고 붙여넣어 주세요.':'AI 서버가 연결되어 있지 않아 공지가 외부로 전송되지 않아요. 연결되면 전송되며, 그때 이 안내와 개인정보 취급 안내가 바뀝니다.';
  const t=new Date();$('noticeToday').textContent=`계산 기준일: ${fmt(isoDate(t))}(${DAY_NAMES[(t.getDay()+6)%7]}) — “다음 주 금요일” 같은 표현은 이 날짜를 기준으로 코드가 계산해요.`;
- updateNoticeCount();renderStepper('input');$('fDate').value=todayKey();navigate(user?'today':'auth');applyStorageNotes();Sync.boot();
+ updateNoticeCount();renderStepper('input');$('fDate').value=todayKey();navigate(user?'today':(introSeen()?'auth':'intro'));applyStorageNotes();Sync.boot();
 }
 function openSheet(){$('sheet').classList.add('show');document.querySelector('#sheet .sheet-item').focus()}
 function closeSheet(){const el=$('sheet');if(el)el.classList.remove('show')}
@@ -672,7 +733,7 @@ function renderAuth(){
  <button class="btn primary full" style="margin-top:4px" onclick="submitAuth()">${su?'가입하고 시작하기':'로그인'}</button>
  <button class="btn full" onclick="setAuthMode('${su?'login':'signup'}')">${su?'이미 계정이 있어요':'처음이에요, 회원가입'}</button>
  <p class="tiny" style="margin:12px 0 0">${Sync.on?NOTES.auth:'계정과 일정은 이 브라우저 안에만 저장돼요. 서버에 계정이 만들어지지 않아 다른 기기에서는 쓸 수 없고, 비밀번호를 잊으면 찾을 수 없어요.'}</p>
- <div class="auth-links"><button onclick="navigate('terms')">이용 약관</button><button onclick="navigate('privacy')">개인정보 안내</button></div>`;
+ <div class="auth-links"><button onclick="openIntro()">서비스 소개</button><button onclick="navigate('terms')">이용 약관</button><button onclick="navigate('privacy')">개인정보 안내</button></div>`;
 }
 var authBusy=false;
 function setAuthBusy(b){const el=document.querySelector('#authCard .btn.primary');if(el){el.disabled=b;el.textContent=b?'확인 중…':(authMode==='signup'?'가입하고 시작하기':'로그인')}}
