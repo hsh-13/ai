@@ -54,14 +54,14 @@
     <div class="top"><div><div class="eyebrow">내 정보와 저장된 데이터</div><h1 id="myTitle">마이</h1></div></div>
     <div class="card" id="profileCard"></div>
     <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)이에요. 계획과 주간 판단에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
-    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.2</span></div></div>
+    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.3</span></div></div>
     <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 지웁니다. 예시 일정에는 “예시” 표시가 붙어요.</p><div class="row2"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
-    <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정·약속·가용 시간을 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
+    <div class="card"><h3>데이터 관리</h3><p class="sub" id="resetNote">이 브라우저에 저장된 일정·약속·가용 시간을 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
     <div class="card"><h3>약관 및 안내</h3>
       <button class="link-row" onclick="navigate('terms')"><span>이용 약관</span><i>›</i></button>
       <button class="link-row" onclick="navigate('privacy')"><span>개인정보 취급 안내</span><i>›</i></button>
     </div>
-    <div class="notice">로그인은 이 브라우저 안의 로컬 계정이에요. 서버 인증이 아니며 데이터는 현재 브라우저의 localStorage에 저장되고 다른 기기와 동기화되지 않습니다.</div>
+    <div class="notice" id="myNote">로그인은 이 브라우저 안의 로컬 계정이에요. 서버 인증이 아니며 데이터는 현재 브라우저의 localStorage에 저장되고 다른 기기와 동기화되지 않습니다.</div>
   </section>
 
   <section class="view" id="view-terms">
@@ -72,7 +72,7 @@
       <h3>2. 서비스 내용</h3><p>일정 등록·관리, 가용 시간 기준 주간 부하 계산, 우선순위 계산, 공지 붙여넣기 일정 추출, 단계 제안, 개인 약속 반영을 제공합니다. 공지 추출과 코멘트는 AI 서버가 연결되면 생성형 AI로, 연결되지 않으면 규칙 기반 Mock으로 처리하며 화면에 어느 쪽인지 표시합니다. 일정 배정, 가용 시간, 우선순위 계산은 항상 규칙(코드)으로 처리합니다.</p>
       <h3>3. 이용자의 책임</h3><p>입력한 일정의 정확성은 이용자가 확인해야 합니다. 이 서비스의 계산 결과는 참고용이므로 실제 마감일과 제출 조건은 직접 확인해 주세요.</p>
       <h3>4. 서비스의 제한</h3><p>프로토타입이므로 예고 없이 기능이 바뀌거나 중단될 수 있습니다. 브라우저 데이터를 삭제하면 저장한 일정이 사라질 수 있습니다.</p>
-      <h3>5. 로그인</h3><p>닉네임와 비밀번호로 가입·로그인하는 기능이며, 계정 정보는 이 브라우저에만 저장됩니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없습니다. 비밀번호는 해시로 저장하지만 같은 기기에서 개발자 도구로 저장 데이터를 열어볼 수 있어 보안 기능으로 보호되지 않습니다. 비밀번호를 잊으면 복구할 수 없습니다.</p>
+      <h3>5. 로그인</h3><p id="termsLogin">닉네임과 비밀번호로 가입·로그인하는 기능이며, 계정 정보는 이 브라우저에만 저장됩니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없습니다. 비밀번호는 해시로 저장하지만 같은 기기에서 개발자 도구로 저장 데이터를 열어볼 수 있어 보안 기능으로 보호되지 않습니다. 비밀번호를 잊으면 복구할 수 없습니다.</p>
     </div>
   </section>
 
@@ -82,10 +82,10 @@
     <div class="card doc">
       <h3>저장하는 정보</h3><p>닉네임, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태, 요구사항, 단계), 개인 약속(이름, 날짜, 시간), 요일별·날짜별 가용 시간.</p>
       <h3>저장하지 않는 정보</h3><p>이름, 학번, 학교 계정, 연락처는 받지 않습니다. 이 서비스 전용 비밀번호만 입력받으며 원문은 저장하지 않습니다. 학교 계정 등 다른 서비스의 비밀번호를 재사용하지 마세요.</p>
-      <h3>저장 위치</h3><p>이 브라우저의 localStorage에만 저장되며 현재 서버로 전송하지 않습니다.</p>
-      <h3>AI 연결 시</h3><p>AI 중계 서버가 연결되면 붙여넣은 공지 텍스트(최대 2,000자)와 일정 요약이 AI 처리를 위해 서버를 거쳐 외부 AI로 전송됩니다. 연결 전에는 전송되지 않습니다. 개인 약속의 내용은 어떤 경우에도 전송하지 않습니다.</p>
+      <h3>저장 위치</h3><p id="privStore">이 브라우저의 localStorage에만 저장되며 현재 서버로 전송하지 않습니다.</p>
+      <h3>AI 연결 시</h3><p>AI 중계 서버가 연결되면 붙여넣은 공지 텍스트(최대 2,000자)와 일정 요약이 AI 처리를 위해 서버를 거쳐 외부 AI로 전송됩니다. 연결 전에는 전송되지 않습니다. 개인 약속의 내용은 AI 처리를 위해서는 전송하지 않습니다.</p>
       <h3>이용자 주의</h3><p>공지를 붙여넣을 때 이름, 학번, 연락처 같은 개인정보가 포함되지 않았는지 확인해 주세요.</p>
-      <h3>삭제 방법</h3><p>마이의 “데이터 전체 초기화”는 현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간을 지웁니다. “계정 삭제”는 계정과 그 계정의 모든 데이터를 지웁니다. 브라우저의 사이트 데이터 삭제로도 지워집니다.</p>
+      <h3>삭제 방법</h3><p id="privDelete">마이의 “데이터 전체 초기화”는 현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간을 지웁니다. “계정 삭제”는 계정과 그 계정의 모든 데이터를 지웁니다. 브라우저의 사이트 데이터 삭제로도 지워집니다.</p>
     </div>
   </section>
 
@@ -121,7 +121,7 @@
       <div class="field"><label for="aDate">날짜 *</label><input id="aDate" type="date" onchange="updateApptPreview()"></div>
       <div class="grid2"><div class="field"><label for="aStart">시작</label><input id="aStart" type="time" value="19:00" onchange="updateApptPreview()"></div><div class="field"><label for="aEnd">종료</label><input id="aEnd" type="time" value="22:00" onchange="updateApptPreview()"></div></div>
       <div class="card" id="apptPreview"></div>
-      <div class="notice">개인 약속은 이 기기에서 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 하루 안에 끝나는 약속만 입력할 수 있습니다.</div>
+      <div class="notice" id="apptNote">개인 약속은 이 기기에서 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 하루 안에 끝나는 약속만 입력할 수 있습니다.</div>
     </div>
     <div class="actions" id="formActions"><button class="btn primary" onclick="saveForm()">저장하기</button><button class="btn" onclick="goBack()">취소</button></div>
   </section>

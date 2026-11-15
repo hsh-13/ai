@@ -12,7 +12,7 @@ const AI_ENDPOINT='';
 // v3.2: 저장소는 이 객체 한곳으로 모은다(localStorage). 구글 시트 연동 때는 이 객체의 구현만 서버 호출로 바꾸고, 화면·계산 코드는 건드리지 않는다.
 const Store={
  get(base){try{return JSON.parse(localStorage.getItem(K(base)))}catch(e){return null}},          // 현재 계정의 데이터 읽기
- set(base,v){localStorage.setItem(K(base),JSON.stringify(v))},                                   // 현재 계정의 데이터 쓰기
+ set(base,v){localStorage.setItem(K(base),JSON.stringify(v));if(Sync&&user)Sync.touch()}, // 서버 모드면 변경을 서버로 보낼 대상으로 표시                                   // 현재 계정의 데이터 쓰기
  del(base){localStorage.removeItem(K(base))},                                                    // 현재 계정의 데이터 삭제
  delFor(base,id){localStorage.removeItem(base+'::'+id)},                                         // 지정한 계정의 데이터 삭제(계정 삭제용)
  session:{get(){try{return localStorage.getItem(USER_KEY)||''}catch(e){return ''}},set(id){try{id?localStorage.setItem(USER_KEY,id):localStorage.removeItem(USER_KEY)}catch(e){}}},
@@ -350,17 +350,115 @@ function confirmReset(){
  [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.del(k));
  hideResetModal();persist();navigate('today');toast('모든 데이터가 초기화되었어요.');
 }
+/* ===== v3.3: 서버(구글 시트) 동기화 — AI_ENDPOINT가 있을 때만 켜진다. 비어 있으면 v3.2처럼 이 브라우저에만 저장한다 ===== */
+const TOKEN_KEY='aiStudyPlannerToken',SYNCMETA_KEY='aiStudyPlannerSync';
+const SYNC_ERR={invalid_nick:'닉네임은 한글·영문·숫자·_ 2~12자로 입력해 주세요.',invalid_pw:'비밀번호는 6~64자로 입력해 주세요.',nick_taken:'이미 사용 중인 닉네임입니다.',bad_credentials:'닉네임 또는 비밀번호가 올바르지 않습니다.',locked:'로그인에 여러 번 실패해 10분간 잠겼어요. 잠시 뒤 다시 시도해 주세요.',rate_limited:'요청이 너무 많아요. 잠시 뒤 다시 시도해 주세요.',busy:'서버가 바빠요. 잠시 뒤 다시 시도해 주세요.'};
+async function serverCall(task,extra){
+ const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),15000);
+ try{
+  // text/plain으로 보내 CORS 사전 요청을 피한다(AI 중계와 같은 방식)
+  const r=await fetch(AI_ENDPOINT,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({task,nick:user,token:Sync.token()},extra)),signal:ctl.signal});
+  if(!r.ok)throw new Error('http '+r.status);
+  return await r.json();
+ }finally{clearTimeout(t)}
+}
+var Sync={
+ on:!!AI_ENDPOINT,status:AI_ENDPOINT?'idle':'local',applying:false,timer:null,busy:false,again:false,ver:0,lastPull:0,
+ token(){try{return localStorage.getItem(TOKEN_KEY)||''}catch(e){return ''}},
+ setToken(t){try{t?localStorage.setItem(TOKEN_KEY,t):localStorage.removeItem(TOKEN_KEY)}catch(e){}},
+ meta(){try{return JSON.parse(localStorage.getItem(SYNCMETA_KEY+'::'+user))||{base:0,dirty:false}}catch(e){return {base:0,dirty:false}}},
+ setMeta(m){try{localStorage.setItem(SYNCMETA_KEY+'::'+user,JSON.stringify(m))}catch(e){}},
+ snapshot(){return {v:1,tasks,avail,ovr,appts}},
+ touch(){ // 데이터가 바뀜 → 잠시 모았다가 서버에 저장
+  if(!this.on||!user||this.applying)return;
+  this.ver++;const m=this.meta();m.dirty=true;this.setMeta(m);this.setStatus('saving');
+  clearTimeout(this.timer);this.timer=setTimeout(()=>this.push(),1200);
+ },
+ async push(force){
+  if(!this.on||!user)return;
+  clearTimeout(this.timer);
+  if(this.busy){this.again=true;return}
+  if(!this.token()){this.expired();return}
+  this.busy=true;this.setStatus('saving');const v0=this.ver;
+  try{
+   const m=this.meta(),x=await serverCall('save',{data:JSON.stringify(this.snapshot()),baseUpdatedAt:m.base,force:!!force});
+   if(x.ok){this.setMeta({base:x.updatedAt,dirty:this.ver!==v0});this.setStatus('synced');if(this.ver!==v0)this.again=true}
+   else if(x.error==='conflict')await this.resolveConflict(x);
+   else if(x.error==='unauthorized')this.expired();
+   else if(x.error==='too_large')this.setStatus('toolarge');
+   else this.setStatus('offline');
+  }catch(e){this.setStatus('offline')}
+  finally{this.busy=false;if(this.again){this.again=false;this.timer=setTimeout(()=>this.push(),300)}}
+ },
+ async resolveConflict(x){ // 다른 기기가 더 최근에 저장함
+  const mine=confirm('다른 기기에서 더 최근에 저장한 데이터가 있어요.\n\n[확인] 이 기기의 데이터로 서버를 덮어쓰기\n[취소] 서버의 데이터를 불러오기(이 기기의 변경은 사라져요)');
+  if(mine){this.setMeta({base:x.updatedAt,dirty:true});this.busy=false;await this.push(true);this.busy=true}
+  else{this.applyServer(x.data,x.updatedAt);refresh()}
+ },
+ applyServer(str,ts){
+  let s=null;try{s=JSON.parse(str)}catch(e){}
+  if(!s||typeof s!=='object')return false;
+  this.applying=true;
+  try{
+   tasks=Array.isArray(s.tasks)?s.tasks:[];avail=Array.isArray(s.avail)&&s.avail.length===7?s.avail.map(Number):DEFAULT_AVAIL.slice();
+   ovr=s.ovr&&typeof s.ovr==='object'&&!Array.isArray(s.ovr)?s.ovr:{};appts=Array.isArray(s.appts)?s.appts:[];commentCache=null;
+   Store.set(STORAGE_KEY,tasks);Store.set(AVAIL_KEY,avail);Store.set(OVR_KEY,ovr);Store.set(APPT_KEY,appts);
+  }finally{this.applying=false}
+  this.setMeta({base:ts,dirty:false});this.setStatus('synced');return true;
+ },
+ afterLogin(x){ // 로그인·가입 직후: 서버 데이터와 이 기기 캐시를 맞춘다
+  const m=this.meta(),hasLocal=tasks.length>0||appts.length>0;
+  if(x.data){
+   if(m.dirty&&confirm('이 기기에 서버에 저장되지 않은 변경이 있어요.\n\n[확인] 이 기기의 데이터로 서버를 덮어쓰기\n[취소] 서버의 데이터를 불러오기')){this.setMeta({base:x.updatedAt,dirty:true});this.push(true)}
+   else this.applyServer(x.data,x.updatedAt);
+  }else if(hasLocal){this.setMeta({base:x.updatedAt||0,dirty:true});this.push()} // 서버가 비어 있고 이 기기에 데이터가 있으면 서버로 올린다
+  else{this.setMeta({base:x.updatedAt||0,dirty:false});this.setStatus('synced')}
+  refresh();
+ },
+ async pull(){ // 앱을 다시 열었을 때 / 탭으로 돌아왔을 때 서버 변경 확인
+  if(!this.on||!user||this.busy)return;
+  if(Date.now()-this.lastPull<20000)return;this.lastPull=Date.now();
+  const m=this.meta();
+  if(m.dirty){this.push();return}
+  try{
+   const x=await serverCall('load');
+   if(x.error==='unauthorized'){this.expired();return}
+   if(!x.ok){this.setStatus('offline');return}
+   if(x.data&&x.updatedAt!==m.base&&this.applyServer(x.data,x.updatedAt))refresh();else this.setStatus('synced');
+  }catch(e){this.setStatus('offline')}
+ },
+ expired(){
+  this.setToken('');this.busy=false;toast('로그인이 만료됐어요. 다시 로그인해 주세요.');switchUser('');
+ },
+ boot(){
+  if(!this.on)return;
+  window.addEventListener('online',()=>{if(user&&this.meta().dirty)this.push()});
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden&&user){this.meta().dirty?this.push():this.pull()}});
+  if(!user)return;
+  if(!this.token()){switchUser('');return} // 로컬 모드에서 만든 세션이면 서버 로그인부터 다시
+  this.setStatus(this.meta().dirty?'saving':'synced');this.pull();
+ },
+ html(){
+  const s=this.status,dot=c=>`<i class="dot ${c}"></i>`;
+  if(s==='local')return '이 브라우저에만 저장돼요';
+  if(s==='saving')return dot('')+'저장 중…';
+  if(s==='offline')return dot('bad')+'서버에 연결하지 못했어요. 이 기기에는 저장돼 있어요.<button onclick="Sync.push()">다시 시도</button>';
+  if(s==='toolarge')return dot('bad')+'데이터가 너무 커서 서버에 저장하지 못했어요. 일정을 줄여 주세요.';
+  return dot('ok')+'서버에 저장됨';
+ },
+ setStatus(s){this.status=s;const el=$('syncStatus');if(el)el.innerHTML=this.html()}
+};
 function switchUser(id){
  user=id;Store.session.set(id);
  authMode='login';tasks=loadTasks();avail=loadAvail();ovr=loadOvr();appts=loadAppts();commentCache=null;
- persist();navigate(id?'today':'auth');
+ $('settingsCount').textContent=tasks.length+'개';navigate(id?'today':'auth');
 }
 function init(){
- persist();renderAvail();
+ $('settingsCount').textContent=tasks.length+'개';renderAvail();
  $('noticeMode').textContent=AI_ENDPOINT?'AI 중계 서버로 추출합니다. 실패하면 결과를 쓰지 않고 대체 방법을 안내해요.':'현재는 규칙 기반 Mock으로 추출해요(AI 서버 미연결). 결과에 “규칙 기반”으로 표시됩니다.';
  $('noticePrivacy').textContent=AI_ENDPOINT?'붙여넣은 공지(최대 2,000자)는 중계 서버(Google Apps Script)를 거쳐 외부 AI로 전송돼요. 이름·학번·연락처 등 개인정보는 지우고 붙여넣어 주세요.':'AI 서버가 연결되어 있지 않아 공지가 외부로 전송되지 않아요. 연결되면 전송되며, 그때 이 안내와 개인정보 취급 안내가 바뀝니다.';
  const t=new Date();$('noticeToday').textContent=`계산 기준일: ${fmt(isoDate(t))}(${DAY_NAMES[(t.getDay()+6)%7]}) — “다음 주 금요일” 같은 표현은 이 날짜를 기준으로 코드가 계산해요.`;
- updateNoticeCount();renderStepper('input');$('fDate').value=todayKey();navigate(user?'today':'auth');
+ updateNoticeCount();renderStepper('input');$('fDate').value=todayKey();navigate(user?'today':'auth');applyStorageNotes();Sync.boot();
 }
 function openSheet(){$('sheet').classList.add('show');document.querySelector('#sheet .sheet-item').focus()}
 function closeSheet(){const el=$('sheet');if(el)el.classList.remove('show')}
@@ -560,7 +658,7 @@ async function hashPw(salt,pw){
 function newSalt(){return Array.from(crypto.getRandomValues(new Uint8Array(8))).map(x=>x.toString(16).padStart(2,'0')).join('')}
 function renderProfile(){
  const el=$('profileCard');if(!el||!user)return;
- el.innerHTML=`<div class="card-title"><span>내 계정</span><span class="pill">로그인됨</span></div><p class="profile-name">${escapeHtml(user)}</p><p class="tiny" style="margin:0 0 12px">일정·가용 시간·분석 결과가 이 닉네임으로 따로 저장됩니다. 이 브라우저 안의 로컬 계정이며 서버 인증이 아닙니다.</p><button class="btn full" style="margin-top:0" onclick="logout()">로그아웃</button><button class="btn full danger-text" onclick="deleteAccount()">계정 삭제</button>`;
+ el.innerHTML=`<div class="card-title"><span>내 계정</span><span class="pill">로그인됨</span></div><p class="profile-name">${escapeHtml(user)}</p><div class="sync" id="syncStatus">${Sync.html()}</div><p class="tiny" style="margin:0 0 12px">일정·가용 시간·분석 결과가 이 닉네임으로 따로 저장됩니다.${Sync.on?' 서버(구글 시트)에도 저장되며, 보안 기능으로 보호되는 서비스는 아닙니다.':' 이 브라우저 안의 로컬 계정이며 서버 인증이 아닙니다.'}</p><button class="btn full" style="margin-top:0" onclick="logout()">로그아웃</button><button class="btn full danger-text" onclick="deleteAccount()">계정 삭제</button>`;
 }
 // v3.1: 앱은 로그인 화면에서 시작한다. 닉네임 + 비밀번호, 계정마다 localStorage 키를 따로 쓴다.
 function setAuthMode(m){authMode=m;renderAuth()}
@@ -573,30 +671,68 @@ function renderAuth(){
  ${su?'<div class="field" style="margin:0 0 12px"><label for="authPw2">비밀번호 확인</label><input id="authPw2" type="password" autocomplete="new-password" placeholder="비밀번호 확인" onkeydown="if(event.key===\'Enter\')submitAuth()"></div>':''}
  <button class="btn primary full" style="margin-top:4px" onclick="submitAuth()">${su?'가입하고 시작하기':'로그인'}</button>
  <button class="btn full" onclick="setAuthMode('${su?'login':'signup'}')">${su?'이미 계정이 있어요':'처음이에요, 회원가입'}</button>
- <p class="tiny" style="margin:12px 0 0">계정과 일정은 이 브라우저 안에만 저장돼요. 서버에 계정이 만들어지지 않아 다른 기기에서는 쓸 수 없고, 비밀번호를 잊으면 찾을 수 없어요.</p>
+ <p class="tiny" style="margin:12px 0 0">${Sync.on?NOTES.auth:'계정과 일정은 이 브라우저 안에만 저장돼요. 서버에 계정이 만들어지지 않아 다른 기기에서는 쓸 수 없고, 비밀번호를 잊으면 찾을 수 없어요.'}</p>
  <div class="auth-links"><button onclick="navigate('terms')">이용 약관</button><button onclick="navigate('privacy')">개인정보 안내</button></div>`;
 }
+var authBusy=false;
+function setAuthBusy(b){const el=document.querySelector('#authCard .btn.primary');if(el){el.disabled=b;el.textContent=b?'확인 중…':(authMode==='signup'?'가입하고 시작하기':'로그인')}}
 async function submitAuth(){
- const id=($('authId').value||'').trim().toLowerCase(),pw=$('authPw').value||'';
- if(authMode==='signup'?!/^[가-힣a-z0-9_]{2,12}$/.test(id):!id){toast(authMode==='signup'?'닉네임은 한글·영문·숫자·_ 2~12자로 입력해 주세요.':'닉네임을 입력해 주세요.');return}
+ if(authBusy)return;
+ const id=($('authId').value||'').trim().toLowerCase(),pw=$('authPw').value||'',su=authMode==='signup';
+ if(su?!/^[가-힣a-z0-9_]{2,12}$/.test(id):!id){toast(su?'닉네임은 한글·영문·숫자·_ 2~12자로 입력해 주세요.':'닉네임을 입력해 주세요.');return}
  if(pw.length<6){toast('비밀번호는 6자 이상 입력해 주세요.');return}
- const acc=getAccounts();
+ if(su&&pw!==$('authPw2').value){toast('비밀번호 확인이 일치하지 않습니다.');return}
+ authBusy=true;setAuthBusy(true);
  try{
-  if(authMode==='signup'){
-   if(pw!==$('authPw2').value){toast('비밀번호 확인이 일치하지 않습니다.');return}
-   if(acc[id]){toast('이미 사용 중인 닉네임입니다.');return}
-   const salt=newSalt();acc[id]={salt,hash:await hashPw(salt,pw)};setAccounts(acc);
-  }else{
-   if(!acc[id]||acc[id].hash!==await hashPw(acc[id].salt,pw)){toast('닉네임 또는 비밀번호가 올바르지 않습니다.');return}
+  if(Sync.on){ // 서버(구글 시트) 계정
+   let x;try{x=await serverCall(su?'signup':'login',{nick:id,pw})}catch(e){toast('서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return}
+   if(!x||!x.ok){toast(SYNC_ERR[x&&x.error]||'처리하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return}
+   Sync.setToken(x.token);switchUser(id);Sync.afterLogin(x);
+  }else{ // 이 브라우저 안의 로컬 계정
+   const acc=getAccounts();
+   try{
+    if(su){if(acc[id]){toast('이미 사용 중인 닉네임입니다.');return}const salt=newSalt();acc[id]={salt,hash:await hashPw(salt,pw)};setAccounts(acc)}
+    else if(!acc[id]||acc[id].hash!==await hashPw(acc[id].salt,pw)){toast('닉네임 또는 비밀번호가 올바르지 않습니다.');return}
+   }catch(e){toast(e.message==='nocrypto'?'이 환경에서는 로그인 기능을 쓸 수 없습니다(HTTPS 필요).':'처리 중 오류가 발생했습니다.');return}
+   switchUser(id);
   }
- }catch(e){toast(e.message==='nocrypto'?'이 환경에서는 로그인 기능을 쓸 수 없습니다(HTTPS 필요).':'처리 중 오류가 발생했습니다.');return}
- const wasSignup=authMode==='signup';switchUser(id);toast(`${id}님, ${wasSignup?'가입 후 ':''}로그인했습니다.`);
+  toast(`${id}님, ${su?'가입 후 ':''}로그인했습니다.`);
+ }finally{authBusy=false;setAuthBusy(false)}
 }
-function logout(){switchUser('');toast('로그아웃했습니다. 계정 데이터는 이 브라우저에 남아 있습니다.')}
-function deleteAccount(){
- if(!user||!confirm(`계정 "${user}"와 이 계정의 일정·설정·분석 결과를 삭제합니다. 되돌릴 수 없습니다.`))return;
- const id=user,acc=getAccounts();delete acc[id];setAccounts(acc);
+async function logout(){
+ let unsaved=false;
+ if(Sync.on&&user){
+  clearTimeout(Sync.timer);
+  if(Sync.meta().dirty){try{await Sync.push()}catch(e){}}
+  unsaved=Sync.meta().dirty;
+  serverCall('logout',{nick:user,token:Sync.token()}).catch(()=>{});Sync.setToken('');
+ }
+ switchUser('');toast(Sync.on?(unsaved?'로그아웃했어요. 서버에 저장하지 못한 변경은 이 기기에 남아 있어요.':'로그아웃했습니다.'):'로그아웃했습니다. 계정 데이터는 이 브라우저에 남아 있습니다.');
+}
+async function deleteAccount(){
+ if(!user||!confirm(Sync.on?`계정 "${user}"와 서버(구글 시트)에 저장된 이 계정의 모든 데이터를 삭제합니다. 되돌릴 수 없습니다.`:`계정 "${user}"와 이 계정의 일정·설정·분석 결과를 삭제합니다. 되돌릴 수 없습니다.`))return;
+ const id=user;
+ if(Sync.on){
+  let x;try{x=await serverCall('remove',{nick:id,token:Sync.token()})}catch(e){toast('서버에 연결하지 못해 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return}
+  if(x.error==='unauthorized'){Sync.expired();toast('로그인이 만료됐어요. 다시 로그인한 뒤 삭제해 주세요.');return}
+  if(!x.ok){toast('서버에서 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return}
+  Sync.setToken('');try{localStorage.removeItem(SYNCMETA_KEY+'::'+id)}catch(e){}
+ }else{const acc=getAccounts();delete acc[id];setAccounts(acc)}
  [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.delFor(k,id));
  switchUser('');toast('계정을 삭제했습니다.');
+}
+/* 저장 위치 안내 문구: 서버 모드일 때만 바꿔 끼운다(기본 HTML은 로컬 모드 문구) */
+const NOTES={
+ auth:'닉네임과 일정은 팀이 만든 구글 시트에 저장돼요. 다른 기기에서도 같은 닉네임으로 로그인할 수 있어요. 비밀번호는 서버에서 해시로 바꿔 저장하지만 팀원이 시트에서 일정 데이터를 볼 수 있으니, 다른 서비스의 비밀번호는 쓰지 마세요. 비밀번호를 잊으면 찾을 수 없어요.',
+ myNote:'로그인 정보와 일정은 팀이 만든 구글 시트에 저장되고, 이 기기에도 같은 데이터가 임시로 저장돼요. 보안 기능으로 보호되는 서비스가 아니니 중요한 개인정보는 넣지 마세요.',
+ resetNote:'이 계정의 일정·약속·가용 시간을 초기화합니다. 서버에도 반영돼요.',
+ apptNote:'개인 약속은 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 다만 계정 데이터로 구글 시트에는 저장돼요. 하루 안에 끝나는 약속만 입력할 수 있습니다.',
+ termsLogin:'닉네임과 비밀번호로 가입·로그인하는 기능이며, 닉네임·비밀번호 해시·일정 데이터는 이 서비스를 운영하는 팀의 구글 시트에 저장되어 다른 기기에서도 같은 계정을 쓸 수 있습니다. 시트를 볼 수 있는 팀원은 닉네임과 일정 데이터를 열람할 수 있습니다. 로그인할 때 비밀번호가 서버(Google Apps Script)에 전달되어 해시로 바뀐 뒤 저장되므로 다른 서비스의 비밀번호를 쓰지 마세요. 프로토타입이라 보안 기능으로 보호되지 않으며, 비밀번호를 잊으면 복구할 수 없습니다.',
+ privStore:'닉네임, 비밀번호 해시, 일정 데이터는 이 서비스를 운영하는 팀이 만든 구글 시트(Google Sheets)에 저장됩니다. 시트를 볼 수 있는 팀원이 이 데이터를 열람할 수 있습니다. 로그인할 때 비밀번호는 HTTPS로 서버(Google Apps Script)에 전달되어 해시로 바뀌며, 비밀번호 원문은 시트에 저장하지 않습니다. 같은 데이터가 이 기기에도 임시로 저장됩니다.',
+ privDelete:'마이의 “데이터 전체 초기화”는 현재 계정의 일정, 약속, 가용 시간을 지우고 서버에도 반영합니다. “계정 삭제”는 시트에서 계정과 그 계정의 모든 데이터를 지웁니다. 이 기기에 임시 저장된 데이터는 브라우저의 사이트 데이터 삭제로 지워집니다.'
+};
+function applyStorageNotes(){
+ if(!Sync.on)return;
+ ['myNote','resetNote','apptNote','termsLogin','privStore','privDelete'].forEach(k=>{const el=$(k);if(el)el.textContent=NOTES[k]});
 }
 init();

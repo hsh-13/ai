@@ -285,3 +285,9 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
 .auth-card .field label small{font-weight:500;color:var(--muted)}
 .auth-links{display:flex;justify-content:center;gap:18px;margin-top:6px}
 .auth-links button{border:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline;min-height:44px;padding:0 4px}
+/* v3.3: 동기화 상태 표시 */
+.sync{display:flex;align-items:center;gap:8px;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:var(--accent-soft);font-size:13px;font-weight:600;line-height:1.4}
+.sync .dot{width:9px;height:9px;border-radius:50%;background:var(--c-tight);flex:none}
+.sync .dot.ok{background:var(--c-ok)}
+.sync .dot.bad{background:var(--c-bad)}
+.sync button{margin-left:auto;border:0;background:none;color:var(--accent);font-weight:800;text-decoration:underline;min-height:32px;padding:0 4px;white-space:nowrap}
