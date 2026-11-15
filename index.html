@@ -3,139 +3,147 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#F3F5FA">
 <title>AI 학업 플래너</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="CSS/style.css">
 </head>
 <body>
 
 <main>
-<div class="app-shell">
-  <div class="appbar"><strong id="appTitle">AI 학업 플래너</strong></div>
+<div class="app-shell" id="shell" data-view="today">
 
-  <section class="view active" id="view-home">
-    <div class="hero"><h1>오늘의 학업 현황</h1><p class="sub" id="todayLabel">오늘 해야 할 일을 확인하세요.</p></div>
+  <!-- 오늘 -->
+  <section class="view active" id="view-today" aria-labelledby="todayTitle">
+    <div class="top"><div><div class="eyebrow" id="todayLabel"></div><h1 id="todayTitle">오늘 할 일</h1></div></div>
     <div id="homeSummary"></div>
-    <div class="stat3">
-      <div class="stat"><span class="tiny">전체 일정</span><b id="totalCount">0개</b></div>
-      <div class="stat"><span class="tiny">완료율</span><b id="completionRate">0%</b><div class="progress"><i id="completionBar" style="width:0%"></i></div><span id="completionText" class="tiny">0 / 0 완료</span></div>
-      <div class="stat" id="nearestBox"><span class="tiny">가장 가까운 마감</span><b id="nearestDday">-</b></div>
-    </div>
-    <div class="notice" id="sampleNotice" hidden>예시 데이터가 포함되어 있습니다. 실제 일정이 아니며 마이 페이지에서 삭제할 수 있습니다.</div>
-    <div class="card" id="homeLoad"></div>
-    <div id="homeAdvice"></div>
-    <div class="sec"><b>오늘 할 일</b><small id="allocMeta"></small></div><div id="homeAlloc"></div>
-    <div class="sec"><b>오늘의 일정</b></div><div id="todayTasks"></div>
-    <div class="sec"><b>AI 우선순위 추천</b></div><div class="card" id="homeRecommendation"></div>
-    <button class="btn primary full" onclick="navigate('analysis')">AI 분석 화면으로 이동 →</button>
+    <div class="sec"><h2>오늘 할 일</h2><small id="allocMeta"></small></div>
+    <div id="homeAlloc"></div>
+    <div class="card cmt" id="aiComment" hidden></div>
+    <div class="notice" id="sampleNotice" hidden>예시 데이터가 포함되어 있습니다. 실제 일정이 아니며 마이에서 삭제할 수 있어요.</div>
   </section>
 
-  <section class="view" id="view-schedule">
-    <div class="week-head"><div><h1>일정 관리</h1><p class="sub" style="margin:4px 0 0">주간 캘린더에서 날짜를 선택하세요.</p></div><div class="row" style="flex:0 0 auto"><button class="btn small" onclick="shiftWeek(-1)">←</button><button class="btn small" onclick="shiftWeek(1)">→</button></div></div>
+  <!-- 계획 -->
+  <section class="view" id="view-plan" aria-labelledby="planTitle">
+    <div class="top"><div><div class="eyebrow">내 공부 일정</div><h1 id="planTitle">계획</h1></div>
+      <div class="wk"><button class="iconbtn" onclick="shiftWeek(-1)" aria-label="이전 주"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><button class="link" onclick="selectDate(isoDate(new Date()))">오늘</button><button class="iconbtn" onclick="shiftWeek(1)" aria-label="다음 주"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button></div></div>
+    <div class="range" id="planRange"></div>
     <div class="week" id="weekGrid"></div>
-    <div class="legend"><span class="ok">여유</span><span class="tight">빠듯</span><span class="bad">부족</span><span class="none">일정 없음</span></div>
-    <div class="card" id="scheduleLoad"></div>
+    <div class="legend" aria-hidden="true"><span class="ok">여유</span><span class="tight">빠듯</span><span class="bad">부족</span><span class="none">일정 없음</span></div>
+    <div id="dayCard"></div>
     <div class="card" id="dayAvail"></div>
-    <div class="card"><div class="card-title"><span id="selectedDateLabel">선택한 날짜</span><button class="btn small" onclick="openAdd()">＋ 일정 추가</button></div><div id="selectedTasks"></div></div>
-    <div class="notice" id="staleNotice" hidden>일정이 변경되었습니다. 기존 AI 분석 결과는 유지되며, 다시 분석 버튼을 눌러 갱신할 수 있습니다.</div>
+    <div class="card" id="scheduleLoad"></div>
   </section>
 
-  <section class="view" id="view-analysis">
-    <h1>AI 학업 분석</h1><p class="sub">마감일·중요도·예상 소요 시간을 기준으로 우선순위를 계산합니다.</p>
-    <div id="aiComment"></div>
-    <div id="analysisContent"></div>
-    <button class="btn full" onclick="getAiComment()">AI 코멘트 받기</button>
-    <button class="btn primary full" onclick="runAnalysis()">✦ 지금 분석하기 / 다시 분석하기</button>
-    <p class="tiny" style="margin-top:9px">현재는 Mock 분석 모드입니다. 우선순위는 브라우저의 규칙 기반 계산으로 제공되며 실제 Gemini API는 연결되지 않았습니다.</p>
+  <!-- 일정 목록 -->
+  <section class="view" id="view-list" aria-labelledby="listTitle">
+    <div class="top"><div><div class="eyebrow" id="listMeta"></div><h1 id="listTitle">일정</h1></div><button class="btn sm" id="sortBtn" onclick="toggleSort()">마감순</button></div>
+    <div class="chips" id="chips" role="group" aria-label="일정 종류 필터"></div>
+    <div id="listItems"></div>
   </section>
 
-  <section class="view" id="view-settings">
-    <h1>마이 페이지</h1><p class="sub">내 정보와 저장된 데이터를 관리합니다.</p>
+  <!-- 마이 -->
+  <section class="view" id="view-settings" aria-labelledby="myTitle">
+    <div class="top"><div><div class="eyebrow">내 정보와 저장된 데이터</div><h1 id="myTitle">마이</h1></div></div>
     <div class="card" id="profileCard"></div>
-    <div class="card"><div class="task"><span class="task-name">앱 소개</span><span class="tiny">AI 학업 플래너</span></div><div class="task"><span class="task-name">저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="task"><span class="task-name">버전</span><span>프로토타입 v2.3</span></div></div>
-    <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)을 입력하면 주간 부하와 우선순위 분석에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
-    <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 삭제합니다. 예시 일정에는 "예시" 표시가 붙습니다.</p><div class="row"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
-    <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정과 분석 결과를 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
+    <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)이에요. 계획과 주간 판단에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
+    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.0</span></div></div>
+    <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 지웁니다. 예시 일정에는 “예시” 표시가 붙어요.</p><div class="row2"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
+    <div class="card"><h3>데이터 관리</h3><p class="sub">이 브라우저에 저장된 일정·약속·가용 시간을 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
     <div class="card"><h3>약관 및 안내</h3>
       <button class="link-row" onclick="navigate('terms')"><span>이용 약관</span><i>›</i></button>
       <button class="link-row" onclick="navigate('privacy')"><span>개인정보 취급 안내</span><i>›</i></button>
     </div>
-    <div class="notice">로그인은 이 브라우저 안의 로컬 계정입니다. 서버 인증이 아니며 데이터는 현재 브라우저의 localStorage에 저장되고 다른 기기와 동기화되지 않습니다.</div>
+    <div class="notice">로그인은 이 브라우저 안의 로컬 계정이에요. 서버 인증이 아니며 데이터는 현재 브라우저의 localStorage에 저장되고 다른 기기와 동기화되지 않습니다.</div>
   </section>
 
   <section class="view" id="view-terms">
-    <button class="back" onclick="navigate('settings')">← 마이 페이지로</button>
-    <h1>이용 약관</h1><p class="sub">수업 프로젝트용 프로토타입 안내문이며 법적 효력이 있는 약관이 아닙니다.</p>
+    <div class="bar"><button class="iconbtn" onclick="navigate('settings')" aria-label="마이로 돌아가기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>이용 약관</h2></div>
+    <p class="sub pad">수업 프로젝트용 프로토타입 안내문이며 법적 효력이 있는 약관이 아닙니다.</p>
     <div class="card doc">
       <h3>1. 서비스 목적</h3><p>AI 학업 플래너는 대학 수업 프로젝트로 만든 학업 일정 관리 프로토타입입니다.</p>
-      <h3>2. 서비스 내용</h3><p>일정 등록·관리, 가용 시간 기준 주간 부하 계산, 우선순위 분석, 공지 붙여넣기 일정 추출을 제공합니다. 현재 분석·추출·코멘트는 규칙 기반 Mock이며 실제 생성형 AI가 연결되어 있지 않습니다.</p>
-      <h3>3. 이용자의 책임</h3><p>입력한 일정의 정확성은 이용자가 확인해야 합니다. 이 서비스의 계산과 분석 결과는 참고용이므로 실제 마감일과 제출 조건은 직접 확인해 주세요.</p>
+      <h3>2. 서비스 내용</h3><p>일정 등록·관리, 가용 시간 기준 주간 부하 계산, 우선순위 계산, 공지 붙여넣기 일정 추출, 단계 제안, 개인 약속 반영을 제공합니다. 공지 추출과 코멘트는 AI 서버가 연결되면 생성형 AI로, 연결되지 않으면 규칙 기반 Mock으로 처리하며 화면에 어느 쪽인지 표시합니다. 일정 배정, 가용 시간, 우선순위 계산은 항상 규칙(코드)으로 처리합니다.</p>
+      <h3>3. 이용자의 책임</h3><p>입력한 일정의 정확성은 이용자가 확인해야 합니다. 이 서비스의 계산 결과는 참고용이므로 실제 마감일과 제출 조건은 직접 확인해 주세요.</p>
       <h3>4. 서비스의 제한</h3><p>프로토타입이므로 예고 없이 기능이 바뀌거나 중단될 수 있습니다. 브라우저 데이터를 삭제하면 저장한 일정이 사라질 수 있습니다.</p>
       <h3>5. 로그인</h3><p>아이디와 비밀번호로 가입·로그인하는 기능이며, 계정 정보는 이 브라우저에만 저장됩니다. 서버에 계정이 만들어지지 않고 다른 기기에서는 쓸 수 없습니다. 비밀번호는 해시로 저장하지만 같은 기기에서 개발자 도구로 저장 데이터를 열어볼 수 있어 보안 기능으로 보호되지 않습니다. 비밀번호를 잊으면 복구할 수 없습니다.</p>
     </div>
   </section>
 
   <section class="view" id="view-privacy">
-    <button class="back" onclick="navigate('settings')">← 마이 페이지로</button>
-    <h1>개인정보 취급 안내</h1><p class="sub">이 서비스가 어떤 정보를 어디에 저장하는지 안내합니다.</p>
+    <div class="bar"><button class="iconbtn" onclick="navigate('settings')" aria-label="마이로 돌아가기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>개인정보 취급 안내</h2></div>
+    <p class="sub pad">이 서비스가 어떤 정보를 어디에 저장하는지 안내합니다.</p>
     <div class="card doc">
-      <h3>저장하는 정보</h3><p>아이디, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태), 요일별·날짜별 가용 시간, 분석 결과.</p>
+      <h3>저장하는 정보</h3><p>아이디, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태, 요구사항, 단계), 개인 약속(이름, 날짜, 시간), 요일별·날짜별 가용 시간.</p>
       <h3>저장하지 않는 정보</h3><p>이름, 학번, 학교 계정, 연락처는 받지 않습니다. 이 서비스 전용 비밀번호만 입력받으며 원문은 저장하지 않습니다. 학교 계정 등 다른 서비스의 비밀번호를 재사용하지 마세요.</p>
       <h3>저장 위치</h3><p>이 브라우저의 localStorage에만 저장되며 현재 서버로 전송하지 않습니다.</p>
-      <h3>AI 연결 시</h3><p>이후 AI 중계 서버가 연결되면 공지 붙여넣기 텍스트와 일정 요약이 AI 처리를 위해 서버로 전송될 수 있습니다. 연결 전에는 전송되지 않습니다. 연결할 때 이 안내를 갱신합니다.</p>
+      <h3>AI 연결 시</h3><p>AI 중계 서버가 연결되면 붙여넣은 공지 텍스트(최대 2,000자)와 일정 요약이 AI 처리를 위해 서버를 거쳐 외부 AI로 전송됩니다. 연결 전에는 전송되지 않습니다. 개인 약속의 내용은 어떤 경우에도 전송하지 않습니다.</p>
       <h3>이용자 주의</h3><p>공지를 붙여넣을 때 이름, 학번, 연락처 같은 개인정보가 포함되지 않았는지 확인해 주세요.</p>
-      <h3>삭제 방법</h3><p>마이 페이지의 "데이터 전체 초기화"는 현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 가용 시간, 분석 결과를 지웁니다. "계정 삭제"는 계정과 그 계정의 모든 데이터를 지웁니다. 브라우저의 사이트 데이터 삭제로도 지워집니다.</p>
+      <h3>삭제 방법</h3><p>마이의 “데이터 전체 초기화”는 현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간을 지웁니다. “계정 삭제”는 계정과 그 계정의 모든 데이터를 지웁니다. 브라우저의 사이트 데이터 삭제로도 지워집니다.</p>
     </div>
   </section>
 
-  <section class="view" id="view-form">
-    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
-    <h1 id="formHeading">일정 등록</h1><p class="sub">직접 입력하거나 파일·URL에서 정보를 가져오는 흐름을 확인할 수 있습니다.</p>
-    <div class="tabs"><button class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button data-tab="paste" onclick="switchTab('paste')">공지 붙여넣기</button><button data-tab="file" onclick="switchTab('file')">파일 업로드</button><button data-tab="url" onclick="switchTab('url')">URL 입력</button></div>
-    <div id="tab-direct">
-      <div class="field"><label>일정명 *</label><input id="fTitle" placeholder="예: 자료구조 과제 제출"></div>
-      <div class="field"><label>일정 종류 *</label><select id="fType"><option>과제</option><option>시험</option><option>발표</option><option>팀 프로젝트</option></select></div>
-      <div class="field"><label>마감 날짜 *</label><input id="fDate" type="date"></div>
-      <div class="field"><label>중요도</label><select id="fImportance"><option>높음</option><option selected>보통</option><option>낮음</option></select></div>
-      <div class="field"><label>예상 소요 시간</label><select id="fEffort"><option value="30">30분</option><option value="60" selected>1시간</option><option value="120">2시간</option><option value="180">3시간</option><option value="300">5시간 이상</option></select></div>
-      <div class="field"><label>진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
-    </div>
-    <div id="tab-paste" class="hidden">
-      <div class="field"><label>강의 공지 붙여넣기</label><textarea id="noticeInput" placeholder="예: [자료구조] 3주차 과제 안내&#10;11월 20일까지 LMS에 제출하세요. 예상 소요 시간 3시간"></textarea></div>
+  <!-- 공지로 일정 추가: 3단계 -->
+  <section class="view" id="view-paste" aria-label="공지로 일정 추가">
+    <div class="bar"><button class="iconbtn" onclick="pasteBack()" aria-label="뒤로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>공지로 일정 추가</h2></div>
+    <div class="stepper" id="stepper" aria-label="진행 단계"></div>
+    <div id="pasteInput">
+      <div class="field"><label for="noticeInput">강의 공지 붙여넣기</label><textarea id="noticeInput" maxlength="2000" oninput="updateNoticeCount()" placeholder="예: [자료구조] 3주차 과제 안내&#10;다음 주 금요일 23:59까지 e-class에 제출하세요. 분량은 A4 3장 이내, 시간복잡도 분석 포함"></textarea><div class="cnt"><span id="noticeCount">0</span> / 2,000자</div></div>
       <div class="notice" id="noticeMode"></div>
-      <button class="btn full" onclick="extractNotice()">일정 추출하기</button>
-      <p class="tiny" style="margin-top:9px">추출 결과는 직접 입력 탭에 채워지며, 확인·수정한 뒤 저장해야 반영됩니다.</p>
+      <div class="notice warn" id="noticePrivacy"></div>
+      <p class="sub" id="noticeToday"></p>
+      <button class="btn primary full" onclick="extractNotice()">추출하기</button>
+      <p class="sub" style="margin-top:12px">텍스트만 지원합니다. 이미지·PDF·구두 공지는 직접 입력해 주세요. 추출 결과는 확인한 뒤에만 일정에 반영돼요.</p>
     </div>
-    <div id="tab-file" class="hidden">
-      <div class="field"><label>안내문 파일 선택 (PNG, JPG, JPEG, PDF)</label><input id="fileInput" type="file" accept=".png,.jpg,.jpeg,.pdf"></div>
-      <div class="notice">프로토타입에서는 실제 OCR/AI 추출을 실행하지 않습니다. 파일을 선택한 뒤 예시 정보 채우기를 누르면 확인용 샘플이 입력됩니다.</div>
-      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
-    </div>
-    <div id="tab-url" class="hidden">
-      <div class="field"><label>공개 웹페이지 URL</label><input id="urlInput" type="url" placeholder="https://example.com/notice"></div>
-      <div class="notice">실제 웹페이지 접속 및 Gemini 추출은 아직 연결되지 않았습니다. 공개 페이지를 가정한 예시 입력을 확인할 수 있습니다.</div>
-      <button class="btn full" onclick="fillSample()">예시 추출 결과 입력</button>
-    </div>
-    <div class="row" style="margin-top:17px"><button class="btn" onclick="navigate('schedule')">취소</button><button class="btn primary" onclick="saveTask()">저장하기</button></div>
+    <div id="extractPanel"></div>
   </section>
 
-  <section class="view" id="view-detail">
-    <button class="back" onclick="navigate('schedule')">← 일정 관리로</button>
+  <!-- 직접 입력 / 개인 약속 -->
+  <section class="view" id="view-form" aria-labelledby="formHeading">
+    <div class="bar"><button class="iconbtn" onclick="goBack()" aria-label="뒤로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2 id="formHeading">일정 등록</h2></div>
+    <div class="seg" id="formTabs" role="tablist"><button role="tab" class="active" data-tab="direct" onclick="switchTab('direct')">직접 입력</button><button role="tab" data-tab="appt" onclick="switchTab('appt')">개인 약속</button></div>
+    <div id="tab-direct">
+      <div class="field"><label for="fTitle">일정명 *</label><input id="fTitle" placeholder="예: 자료구조 과제 제출"></div>
+      <div class="field"><label for="fType">일정 종류 *</label><select id="fType"><option>과제</option><option>시험</option><option>발표</option><option>팀 프로젝트</option></select></div>
+      <div class="field"><label for="fDate">마감 날짜 *</label><input id="fDate" type="date"></div>
+      <div class="field"><label for="fImportance">중요도</label><select id="fImportance"><option>높음</option><option selected>보통</option><option>낮음</option></select></div>
+      <div class="field"><label for="fEffort">예상 소요 시간</label><select id="fEffort"><option value="30">30분</option><option value="60" selected>1시간</option><option value="120">2시간</option><option value="180">3시간</option><option value="300">5시간 이상</option></select></div>
+      <div class="field"><label for="fStatus">진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
+    </div>
+    <div id="tab-appt" class="hidden">
+      <div class="field"><label for="aTitle">약속 이름 *</label><input id="aTitle" placeholder="예: 저녁 약속" oninput="updateApptPreview()"></div>
+      <div class="field"><label for="aDate">날짜 *</label><input id="aDate" type="date" onchange="updateApptPreview()"></div>
+      <div class="grid2"><div class="field"><label for="aStart">시작</label><input id="aStart" type="time" value="19:00" onchange="updateApptPreview()"></div><div class="field"><label for="aEnd">종료</label><input id="aEnd" type="time" value="22:00" onchange="updateApptPreview()"></div></div>
+      <div class="card" id="apptPreview"></div>
+      <div class="notice">개인 약속은 이 기기에서 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 하루 안에 끝나는 약속만 입력할 수 있습니다.</div>
+    </div>
+    <div class="actions" id="formActions"><button class="btn primary" onclick="saveForm()">저장하기</button><button class="btn" onclick="goBack()">취소</button></div>
+  </section>
+
+  <!-- 일정 상세 -->
+  <section class="view" id="view-detail" aria-label="일정 상세">
+    <div class="bar"><button class="iconbtn" onclick="goBack()" aria-label="뒤로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>일정 상세</h2></div>
     <div id="detailContent"></div>
   </section>
 
-  <button class="fab" id="fab" onclick="openAdd()" aria-label="일정 추가"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
-  <nav class="nav">
-    <button data-nav="home" class="active" onclick="navigate('home')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7"/><path d="M5 9v12h14V9M9 21v-7h6v7"/></svg></b>홈</button>
-    <button data-nav="schedule" onclick="navigate('schedule')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 14h2M14 14h2M8 17h2"/></svg></b>일정</button>
-    <button data-nav="analysis" onclick="navigate('analysis')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/><path d="m19 16 .9 2.1L22 19l-2.1.9L19 22l-.9-2.1L16 19l2.1-.9L19 16Z"/></svg></b>AI 분석</button>
-    <button data-nav="settings" onclick="navigate('settings')"><b><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></b>마이 페이지</button>
+  <nav class="nav" aria-label="하단 메뉴">
+    <button data-nav="today" class="active" onclick="navigate('today')" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v11h14V10"/><path d="M10 21v-6h4v6"/></svg>오늘</button>
+    <button data-nav="plan" onclick="navigate('plan')"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>계획</button>
+    <button class="nav-add" id="navAdd" onclick="openSheet()" aria-label="일정 추가" aria-haspopup="dialog"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></i>추가</button>
+    <button data-nav="list" onclick="navigate('list')"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h12M9 12h12M9 18h12"/><circle cx="4.5" cy="6" r="1"/><circle cx="4.5" cy="12" r="1"/><circle cx="4.5" cy="18" r="1"/></svg>일정</button>
+    <button data-nav="settings" onclick="navigate('settings')"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>마이</button>
   </nav>
 </div>
-
 </main>
 
-<div class="modal-backdrop" id="resetModal"><div class="modal"><h3>모든 데이터를 초기화할까요?</h3><p>현재 계정(로그인 전이면 로그인 전 데이터)의 일정과 최근 분석 결과가 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
-<div class="toast" id="toast"></div>
+<div class="sheet-backdrop" id="sheet" onclick="if(event.target===this)closeSheet()"><div class="sheet" role="dialog" aria-modal="true" aria-label="무엇을 추가할까요?"><div class="grip"></div><h3>무엇을 추가할까요?</h3>
+  <button class="sheet-item main" onclick="openPaste()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M8 12h8M8 16h5"/></svg></i><span><b>공지 붙여넣기 <em class="tag ai">AI</em></b><small>공지 글을 붙여넣으면 마감일과 요구사항을 읽어 줘요</small></span></button>
+  <button class="sheet-item" onclick="openAdd()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></i><span><b>직접 입력</b><small>일정명·마감일·소요 시간을 직접 적어요</small></span></button>
+  <button class="sheet-item" onclick="openAppt()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i><span><b>개인 약속</b><small>알바·약속 시간을 가용 시간에서 빼요</small></span></button>
+  <button class="btn full" onclick="closeSheet()">닫기</button></div></div>
+<div class="modal-backdrop" id="resetModal"><div class="modal" role="dialog" aria-modal="true" aria-label="데이터 초기화"><h3>모든 데이터를 초기화할까요?</h3><p>현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row2"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="JS/app.js" defer></script>
 </body>
