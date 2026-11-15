@@ -14,6 +14,12 @@
 <main>
 <div class="app-shell" id="shell" data-view="auth" data-auth="out">
 
+  <!-- 공부 타이머 -->
+  <section class="view" id="view-timer" aria-label="공부 타이머">
+    <div class="bar"><button class="iconbtn" onclick="timerResult=null;navigate('today')" aria-label="뒤로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>공부 타이머</h2></div>
+    <div id="timerBody"></div>
+  </section>
+
   <!-- 서비스 소개(처음 방문할 때만) -->
   <section class="view" id="view-intro" aria-label="서비스 소개">
     <div class="intro-top"><button class="intro-skip" id="introSkip" onclick="finishIntro()">건너뛰기</button></div>
@@ -30,6 +36,7 @@
   <section class="view" id="view-today" aria-labelledby="todayTitle">
     <div class="top"><div><div class="eyebrow" id="todayLabel"></div><h1 id="todayTitle">오늘 할 일</h1></div><button class="help-btn" onclick="openIntro()" aria-label="사용법 보기"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.2c-.8.4-1.2 1-1.2 1.9"/><path d="M12 17h.01"/></svg></button></div>
     <div id="homeSummary"></div>
+    <div id="gameCard"></div>
     <div class="sec"><h2>오늘 할 일</h2><small id="allocMeta"></small></div>
     <div id="homeAlloc"></div>
     <div class="card cmt" id="aiComment" hidden></div>
@@ -60,7 +67,7 @@
     <div class="top"><div><div class="eyebrow">내 정보와 저장된 데이터</div><h1 id="myTitle">마이</h1></div></div>
     <div class="card" id="profileCard"></div>
     <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)이에요. 계획과 주간 판단에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
-    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.6</span></div></div>
+    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.7</span></div></div>
     <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 지웁니다. 예시 일정에는 “예시” 표시가 붙어요.</p><div class="row2"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
     <div class="card"><h3>데이터 관리</h3><p class="sub" id="resetNote">이 브라우저에 저장된 일정·약속·가용 시간을 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
     <div class="card"><h3>약관 및 안내</h3>
@@ -86,7 +93,7 @@
     <div class="bar"><button class="iconbtn" onclick="navigate('settings')" aria-label="마이로 돌아가기"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>개인정보 취급 안내</h2></div>
     <p class="sub pad">이 서비스가 어떤 정보를 어디에 저장하는지 안내합니다.</p>
     <div class="card doc">
-      <h3>저장하는 정보</h3><p>닉네임, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태, 요구사항, 단계), 개인 약속(이름, 날짜, 시간), 요일별·날짜별 가용 시간.</p>
+      <h3>저장하는 정보</h3><p>닉네임, 비밀번호 해시(비밀번호 원문은 저장하지 않음), 계정별 일정 정보(제목, 종류, 마감일, 중요도, 소요 시간, 진행 상태, 요구사항, 단계), 개인 약속(이름, 날짜, 시간), 요일별·날짜별 가용 시간, 공부 기록(공부한 시작·종료 시각과 시간, 연결한 일정).</p>
       <h3>저장하지 않는 정보</h3><p>이름, 학번, 학교 계정, 연락처는 받지 않습니다. 이 서비스 전용 비밀번호만 입력받으며 원문은 저장하지 않습니다. 학교 계정 등 다른 서비스의 비밀번호를 재사용하지 마세요.</p>
       <h3>저장 위치</h3><p id="privStore">이 브라우저의 localStorage에만 저장되며 현재 서버로 전송하지 않습니다.</p>
       <h3>AI 연결 시</h3><p>AI 중계 서버가 연결되면 붙여넣은 공지 텍스트(최대 2,000자)와 일정 요약이 AI 처리를 위해 서버를 거쳐 외부 AI로 전송됩니다. 연결 전에는 전송되지 않습니다. 개인 약속의 내용은 AI 처리를 위해서는 전송하지 않습니다.</p>
@@ -153,7 +160,7 @@
   <button class="sheet-item" onclick="openAdd()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></i><span><b>직접 입력</b><small>일정명·마감일·소요 시간을 직접 적어요</small></span></button>
   <button class="sheet-item" onclick="openAppt()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i><span><b>개인 약속</b><small>알바·약속 시간을 가용 시간에서 빼요</small></span></button>
   <button class="btn full" onclick="closeSheet()">닫기</button></div></div>
-<div class="modal-backdrop" id="resetModal"><div class="modal" role="dialog" aria-modal="true" aria-label="데이터 초기화"><h3>모든 데이터를 초기화할까요?</h3><p>현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row2"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
+<div class="modal-backdrop" id="resetModal"><div class="modal" role="dialog" aria-modal="true" aria-label="데이터 초기화"><h3>모든 데이터를 초기화할까요?</h3><p>현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간, 공부 기록(레벨 포함)이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row2"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script src="JS/app.js" defer></script>

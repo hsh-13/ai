@@ -13,12 +13,14 @@ const AI_ENDPOINT='';
 const Store={
  get(base){try{return JSON.parse(localStorage.getItem(K(base)))}catch(e){return null}},          // 현재 계정의 데이터 읽기
  set(base,v){localStorage.setItem(K(base),JSON.stringify(v));if(Sync&&user)Sync.touch()}, // 서버 모드면 변경을 서버로 보낼 대상으로 표시                                   // 현재 계정의 데이터 쓰기
+ setLocal(base,v){localStorage.setItem(K(base),JSON.stringify(v))}, // 이 기기에만 저장(서버 동기화 대상 아님: 실행 중 타이머)
  del(base){localStorage.removeItem(K(base))},                                                    // 현재 계정의 데이터 삭제
  delFor(base,id){localStorage.removeItem(base+'::'+id)},                                         // 지정한 계정의 데이터 삭제(계정 삭제용)
  session:{get(){try{return localStorage.getItem(USER_KEY)||''}catch(e){return ''}},set(id){try{id?localStorage.setItem(USER_KEY,id):localStorage.removeItem(USER_KEY)}catch(e){}}},
  accounts:{get(){try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY))||{}}catch(e){return {}}},set(a){localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(a))}}
 };
-let user=loadUser(), authMode='login', tasks=loadTasks(), avail=loadAvail(), ovr=loadOvr(), appts=loadAppts(), draft=null, extractCtl=null, lastNotice='', formTab='direct', currentView='today', lastMain='today', selectedDate=isoDate(new Date()), weekStart=isoDate(startOfWeek(new Date())), editingId=null, listFilter='전체', listSort='due', pasteState='input', commentCache=null;
+const GAME_KEY='aiStudyPlannerGame',TIMER_KEY='aiStudyPlannerTimer';
+let user=loadUser(), authMode='login', tasks=loadTasks(), avail=loadAvail(), ovr=loadOvr(), appts=loadAppts(), game=loadGame(), timer=loadTimer(), timerResult=null, draft=null, extractCtl=null, lastNotice='', formTab='direct', currentView='today', lastMain='today', selectedDate=isoDate(new Date()), weekStart=isoDate(startOfWeek(new Date())), editingId=null, listFilter='전체', listSort='due', pasteState='input', commentCache=null;
 const esc=s=>escapeHtml(s);
 const CHK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 const SPARK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg>';
@@ -42,7 +44,7 @@ function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('sho
 
 /* ===== v3.0: 화면 이동 — 하단 탭 5개(오늘 / 계획 / ＋ / 일정 / 마이) ===== */
 const MAIN=['today','plan','list','settings'];
-const NAV_OF={today:'today',plan:'plan',list:'list',detail:'list',settings:'settings',terms:'settings',privacy:'settings'};
+const NAV_OF={timer:'today',today:'today',plan:'plan',list:'list',detail:'list',settings:'settings',terms:'settings',privacy:'settings'};
 function renderView(v){
  if(v==='today')renderToday();
  else if(v==='plan')renderPlan();
@@ -51,6 +53,7 @@ function renderView(v){
  else if(v==='detail')renderDetail();
  else if(v==='auth')renderAuth();
  else if(v==='intro')renderIntro();
+ else if(v==='timer')renderTimer();
 }
 function navigate(view){
  if(view==='home')view='today';
@@ -105,7 +108,7 @@ function renderToday(){
  const plan=buildPlan(),k=todayKey(),pend=sortAlloc(plan.alloc[k]||[]),dn=doneToday(),left=pend.reduce((a,x)=>a+x.h,0);
  $('todayLabel').textContent=(user?user+'님 · ':'')+new Intl.DateTimeFormat('ko-KR',{month:'long',day:'numeric',weekday:'long'}).format(new Date());
  $('todayTitle').innerHTML=!tasks.length?'일정을 추가해 보세요':pend.length?`오늘 할 일 <em>${pend.length}개</em>, ${hh(left)}`:dn.length?'오늘 할 일을 모두 끝냈어요':'오늘 배정된 일이 없어요';
- renderSummary(plan);
+ renderSummary(plan);renderGameCard();
  $('allocMeta').textContent=(pend.length||dn.length)?`${dn.length} / ${pend.length+dn.length} 완료${pend.length?' · 남은 '+hh(left):''}`:'';
  const rows=pend.concat(dn).map(todayRow).join('');
  $('homeAlloc').innerHTML=rows||(tasks.length?'<div class="card empty">오늘 배정된 작업이 없어요.<br>계획 탭에서 이번 주를 확인해 보세요.</div>':'<div class="card empty">등록된 일정이 없어요.<br>아래 ＋ 버튼으로 공지를 붙여넣거나 직접 추가해 보세요.<br><button class="btn sm" style="margin-top:10px" onclick="seedSample()">예시 데이터 넣기</button></div>');
@@ -242,7 +245,7 @@ function renderDetail(){
  if(!t){$('detailContent').innerHTML='<div class="card empty">일정을 찾을 수 없어요.</div>';return}
  const plan=buildPlan(),pm=prioMap(),p=pm[t.id],d=dday(t);
  $('detailContent').innerHTML=`<div class="card" style="margin-top:14px"><div class="row"><i class="dot" style="background:${typeColor(t.type)}"></i><span class="small muted">${esc(t.type)}${t.sample?' · 예시':''}</span><div class="grow"></div><span class="dday ${d.cls}">${d.label}</span></div><h1 style="margin:8px 0 10px">${esc(t.title)}</h1>
- <div class="dl"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="dl"><span>중요도</span><b>${esc(t.importance)}</b></div><div class="dl"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div>
+ <div class="dl"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="dl"><span>중요도</span><b>${esc(t.importance)}</b></div><div class="dl"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div>${studyMinOf(t.id)?`<div class="dl"><span>공부한 시간</span><b>${fmtMin(studyMinOf(t.id))}</b></div>`:''}
  <div class="dl"><label for="stSel">진행 상태</label><select id="stSel" onchange="changeStatus('${t.id}',this.value)"><option ${t.status==='시작 전'?'selected':''}>시작 전</option><option ${t.status==='진행 중'?'selected':''}>진행 중</option><option ${t.status==='완료'?'selected':''}>완료</option></select></div></div>
  ${p?`<div class="card"><div class="row"><b class="grow">우선순위 ${p.rank}위</b><span class="tag rule">규칙</span><span class="num">${p.score}점</span></div><p class="small muted" style="margin:8px 0 0">${esc(reasonOf(t,plan))}</p></div>`:''}
  ${detailExtra(t)}
@@ -350,9 +353,92 @@ function seedSample(){
 }
 function clearSample(){tasks=tasks.filter(t=>!t.sample);persist();refresh();toast('예시 데이터를 삭제했어요.')}
 function confirmReset(){
- tasks=[];avail=DEFAULT_AVAIL.slice();ovr={};appts=[];commentCache=null;
- [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.del(k));
+ tasks=[];avail=DEFAULT_AVAIL.slice();ovr={};appts=[];game=emptyGame();timer=null;timerResult=null;commentCache=null;
+ [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY,GAME_KEY,TIMER_KEY].forEach(k=>Store.del(k));
  hideResetModal();persist();navigate('today');toast('모든 데이터가 초기화되었어요.');
+}
+/* ===== v3.7: 공부 타이머 · 경험치 · 레벨 (1단계: 확률 요소 없음) =====
+ * 경험치 = 공부한 분(1분 = 1 XP). 세션 기록에서 계산하므로 저장값과 어긋나지 않는다.
+ * 상한·최소 시간·레벨 곡선의 숫자는 팀이 임의로 정한 값이다. 2~3단계(드랍·이벤트·상자)는 bonusXp와 items 필드를 더해 확장한다. */
+const MAX_SESSION_MIN=120,MIN_SESSION_MIN=1,KEEP_SESSIONS=150; // 한 번에 인정하는 최대 시간(분) / 이보다 짧으면 기록하지 않음 / 저장 크기 때문에 상세 기록은 최근 150건만 유지
+function emptyGame(){return {v:1,archivedMin:0,bonusXp:0,sessions:[]}}
+function loadGame(){try{const g=Store.get(GAME_KEY);return g&&Array.isArray(g.sessions)?{v:1,archivedMin:Number(g.archivedMin)||0,bonusXp:Number(g.bonusXp)||0,sessions:g.sessions}:emptyGame()}catch(e){return emptyGame()}}
+function loadTimer(){try{const t=Store.get(TIMER_KEY);return t&&Number(t.start)>0?t:null}catch(e){return null}}
+function persistGame(){if(user)Store.set(GAME_KEY,game)}
+function totalMin(g){g=g||game;return (g.archivedMin||0)+g.sessions.reduce((a,s)=>a+s.min,0)}
+function xpTotal(g){g=g||game;return totalMin(g)+(g.bonusXp||0)}
+function levelInfo(xp){ // 레벨 L → L+1 에 필요한 XP = 60 + 30×(L-1): 1→2는 1시간, 2→3은 1.5시간…
+ let lv=1,left=Math.max(0,Math.floor(xp)),need=60;
+ while(left>=need){left-=need;lv++;need=60+30*(lv-1)}
+ return {level:lv,into:left,need,total:Math.max(0,Math.floor(xp))};
+}
+function fmtMin(m){m=Math.round(m);const h=Math.floor(m/60),r=m%60;return h?(r?`${h}시간 ${r}분`:`${h}시간`):`${r}분`}
+function fmtClock(ms){const s=Math.max(0,Math.floor(ms/1000));return [Math.floor(s/3600),Math.floor(s/60)%60,s%60].map(n=>String(n).padStart(2,'0')).join(':')}
+function studyMinOf(id){return game.sessions.filter(s=>s.taskId===id).reduce((a,s)=>a+s.min,0)}
+function studyMinOn(key){return game.sessions.filter(s=>isoDate(new Date(s.end))===key).reduce((a,s)=>a+s.min,0)} // 자정을 넘긴 세션은 끝난 날짜에 합산
+function addSession(s){
+ game.sessions.push(s);
+ if(game.sessions.length>KEEP_SESSIONS){const old=game.sessions.splice(0,game.sessions.length-KEEP_SESSIONS);game.archivedMin+=old.reduce((a,x)=>a+x.min,0)}
+ persistGame();
+}
+function openTimer(){if(!user)return;timerResult=null;navigate('timer')}
+function startTimer(){
+ if(!user||timer)return;
+ const sel=$('timerTask'),id=sel&&sel.value?sel.value:null;
+ timer={start:Date.now(),taskId:id};Store.setLocal(TIMER_KEY,timer);timerResult=null;syncTick();renderTimer();
+}
+function stopTimer(){
+ if(!timer)return;
+ const t=timer,end=Date.now(),raw=Math.floor((end-t.start)/60000),min=Math.min(raw,MAX_SESSION_MIN);
+ const before=levelInfo(xpTotal());
+ timer=null;Store.del(TIMER_KEY);syncTick();
+ if(min<MIN_SESSION_MIN){timerResult={min:0};renderTimer();return}
+ addSession({id:crypto.randomUUID?crypto.randomUUID():String(end),taskId:t.taskId||null,start:t.start,end,min});
+ const after=levelInfo(xpTotal()),tk=tasks.find(x=>x.id===t.taskId);
+ timerResult={min,raw,capped:raw>MAX_SESSION_MIN,up:after.level>before.level,level:after.level,title:tk?tk.title:''};
+ renderTimer();
+}
+function closeTimerResult(){timerResult=null;navigate('today')}
+function tickTimer(){
+ if(!timer)return;
+ const ms=Date.now()-timer.start;
+ document.querySelectorAll('[data-clock]').forEach(el=>el.textContent=el.dataset.clock==='short'?fmtClock(ms).replace(/^00:/,''):fmtClock(ms));
+ const cap=$('timerCap');if(cap)cap.hidden=Math.floor(ms/60000)<MAX_SESSION_MIN;
+}
+let tickId=null;
+function syncTick(){ // 타이머가 실행 중일 때만 1초 간격으로 시계를 갱신한다
+ if(timer&&!tickId)tickId=setInterval(tickTimer,1000);
+ else if(!timer&&tickId){clearInterval(tickId);tickId=null}
+}
+const AVATAR='<svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="38" fill="#E6ECFF"/><path d="M16 74c2-14 12-20 24-20s22 6 24 20z" fill="#3452E1"/><rect x="31" y="50" width="18" height="9" rx="4" fill="#FFD9B8"/><circle cx="40" cy="36" r="16" fill="#FFD9B8"/><path d="M23 34c0-12 8-18 17-18s17 6 17 18c-4-6-9-8-17-8s-13 2-17 8z" fill="#2B2F45"/><circle cx="34" cy="38" r="2" fill="#2B2F45"/><circle cx="46" cy="38" r="2" fill="#2B2F45"/><path d="M35 44c3 3 7 3 10 0" fill="none" stroke="#2B2F45" stroke-width="2" stroke-linecap="round"/></svg>';
+function xpBar(li){return `<div class="gbar" role="progressbar" aria-valuemin="0" aria-valuemax="${li.need}" aria-valuenow="${li.into}"><i style="width:${Math.round(li.into/li.need*100)}%"></i></div><div class="gxp"><span>다음 레벨까지</span><span>${li.into} / ${li.need} XP</span></div>`}
+function renderGameCard(){
+ syncTick();
+ const el=$('gameCard');if(!el)return;
+ if(!user){el.innerHTML='';return}
+ const li=levelInfo(xpTotal()),today=studyMinOn(todayKey());
+ el.innerHTML=`<div class="gcard"><div class="ghead"><div class="gch">${AVATAR}<span class="glv">Lv.${li.level}</span></div><div class="grow"><p class="gtitle">나의 공부 캐릭터</p><p class="gsub">${timer?'공부 중':'오늘 공부 '+(today?fmtMin(today):'0분')}</p>${xpBar(li)}</div></div>
+ ${timer?`<button class="btn primary full gbtn" onclick="openTimer()"><span data-clock="full">${fmtClock(Date.now()-timer.start)}</span> · 타이머 열기</button>`:`<button class="btn primary full gbtn" onclick="openTimer()">공부 시작</button>`}</div>`;
+}
+function renderTimer(){
+ syncTick();
+ const el=$('timerBody');if(!el)return;
+ if(!user){el.innerHTML='';return}
+ if(timerResult){ // 종료 결과
+  const r=timerResult,li=levelInfo(xpTotal());
+  el.innerHTML=r.min===0?`<div class="card tcard"><h2 class="tres">기록하지 못했어요</h2><p class="tsub">1분 미만은 기록되지 않아요.</p><button class="btn primary full" onclick="closeTimerResult()">확인</button></div>`:
+  `<div class="card tcard">${r.up?`<div class="lvup">레벨 업! Lv.${r.level}</div>`:''}<div class="tavatar">${AVATAR}<span class="glv">Lv.${li.level}</span></div><h2 class="tres">+${r.min} XP</h2><p class="tsub">${fmtMin(r.min)} 공부했어요${r.title?' · '+esc(r.title):''}</p>${r.capped?`<p class="tcap">${fmtMin(r.raw)} 동안 켜져 있었지만 한 번에 인정하는 시간은 최대 ${MAX_SESSION_MIN}분이에요.</p>`:''}${xpBar(li)}<button class="btn primary full" style="margin-top:16px" onclick="closeTimerResult()">확인</button></div>`;
+  return;
+ }
+ if(timer){ // 실행 중
+  const tk=tasks.find(x=>x.id===timer.taskId);
+  el.innerHTML=`<div class="card tcard"><p class="tsub">${tk?esc(tk.title):'자유 공부'}</p><div class="tclock" data-clock="full" role="timer" aria-live="off">${fmtClock(Date.now()-timer.start)}</div><p class="tcap" id="timerCap" ${Math.floor((Date.now()-timer.start)/60000)<MAX_SESSION_MIN?'hidden':''}>한 번에 인정하는 시간은 최대 ${MAX_SESSION_MIN}분이에요.</p><p class="tnote">화면을 끄거나 앱을 닫아도 시작한 시각 기준으로 시간이 계산돼요.</p><button class="btn danger full" onclick="stopTimer()">종료하고 기록</button></div>`;
+  return;
+ }
+ const plan=buildPlan(),first=((plan.alloc[todayKey()]||[])[0]||{}).id;
+ const act=tasks.filter(t=>t.status!=='완료').sort((a,b)=>a.date.localeCompare(b.date));
+ const li=levelInfo(xpTotal());
+ el.innerHTML=`<div class="card tcard"><div class="tavatar">${AVATAR}<span class="glv">Lv.${li.level}</span></div><div class="field" style="text-align:left"><label for="timerTask">무엇을 공부하나요?</label><select id="timerTask"><option value="">자유 공부 (일정 없음)</option>${act.map(t=>`<option value="${t.id}" ${t.id===first?'selected':''}>${esc(t.title)}</option>`).join('')}</select></div><button class="btn primary full" onclick="startTimer()">시작</button><div class="tstat"><div><span>오늘</span><b>${fmtMin(studyMinOn(todayKey()))}</b></div><div><span>전체</span><b>${fmtMin(totalMin())}</b></div></div><p class="tnote">공부한 1분마다 경험치 1 XP를 얻어요. 한 번에 최대 ${MAX_SESSION_MIN}분까지 인정되고, 1분 미만은 기록되지 않아요.</p></div>`;
 }
 /* ===== v3.4: 서비스 소개(처음 방문할 때만, 건너뛰기 가능) ===== */
 const INTRO_KEY='aiStudyPlannerIntroSeen';
@@ -430,7 +516,7 @@ var Sync={
  setToken(t){try{t?localStorage.setItem(TOKEN_KEY,t):localStorage.removeItem(TOKEN_KEY)}catch(e){}},
  meta(){try{return JSON.parse(localStorage.getItem(SYNCMETA_KEY+'::'+user))||{base:0,dirty:false}}catch(e){return {base:0,dirty:false}}},
  setMeta(m){try{localStorage.setItem(SYNCMETA_KEY+'::'+user,JSON.stringify(m))}catch(e){}},
- snapshot(){return {v:1,tasks,avail,ovr,appts}},
+ snapshot(){return {v:1,tasks,avail,ovr,appts,game}},
  touch(){ // 데이터가 바뀜 → 잠시 모았다가 서버에 저장
   if(!this.on||!user||this.applying)return;
   this.ver++;const m=this.meta();m.dirty=true;this.setMeta(m);this.setStatus('saving');
@@ -464,12 +550,13 @@ var Sync={
   try{
    tasks=Array.isArray(s.tasks)?s.tasks:[];avail=Array.isArray(s.avail)&&s.avail.length===7?s.avail.map(Number):DEFAULT_AVAIL.slice();
    ovr=s.ovr&&typeof s.ovr==='object'&&!Array.isArray(s.ovr)?s.ovr:{};appts=Array.isArray(s.appts)?s.appts:[];commentCache=null;
-   Store.set(STORAGE_KEY,tasks);Store.set(AVAIL_KEY,avail);Store.set(OVR_KEY,ovr);Store.set(APPT_KEY,appts);
+   if(s.game&&Array.isArray(s.game.sessions))game={v:1,archivedMin:Number(s.game.archivedMin)||0,bonusXp:Number(s.game.bonusXp)||0,sessions:s.game.sessions}; // 이전 버전 데이터에는 game이 없으므로 그때는 이 기기 기록을 유지
+   Store.set(STORAGE_KEY,tasks);Store.set(AVAIL_KEY,avail);Store.set(OVR_KEY,ovr);Store.set(APPT_KEY,appts);Store.set(GAME_KEY,game);
   }finally{this.applying=false}
   this.setMeta({base:ts,dirty:false});this.setStatus('synced');return true;
  },
  afterLogin(x){ // 로그인·가입 직후: 서버 데이터와 이 기기 캐시를 맞춘다
-  const m=this.meta(),hasLocal=tasks.length>0||appts.length>0;
+  const m=this.meta(),hasLocal=tasks.length>0||appts.length>0||game.sessions.length>0||game.archivedMin>0;
   if(x.data){
    if(m.dirty&&confirm('이 기기에 서버에 저장되지 않은 변경이 있어요.\n\n[확인] 이 기기의 데이터로 서버를 덮어쓰기\n[취소] 서버의 데이터를 불러오기')){this.setMeta({base:x.updatedAt,dirty:true});this.push(true)}
    else this.applyServer(x.data,x.updatedAt);
@@ -512,7 +599,7 @@ var Sync={
 };
 function switchUser(id){
  user=id;Store.session.set(id);
- authMode='login';tasks=loadTasks();avail=loadAvail();ovr=loadOvr();appts=loadAppts();commentCache=null;
+ authMode='login';tasks=loadTasks();avail=loadAvail();ovr=loadOvr();appts=loadAppts();game=loadGame();timer=loadTimer();timerResult=null;commentCache=null;
  $('settingsCount').textContent=tasks.length+'개';navigate(id?'today':'auth');
 }
 function init(){
@@ -780,18 +867,18 @@ async function deleteAccount(){
   if(!x.ok){toast('서버에서 삭제하지 못했어요. 잠시 뒤 다시 시도해 주세요.');return}
   Sync.setToken('');try{localStorage.removeItem(SYNCMETA_KEY+'::'+id)}catch(e){}
  }else{const acc=getAccounts();delete acc[id];setAccounts(acc)}
- [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY].forEach(k=>Store.delFor(k,id));
+ [STORAGE_KEY,ANALYSIS_KEY,AVAIL_KEY,OVR_KEY,APPT_KEY,GAME_KEY,TIMER_KEY].forEach(k=>Store.delFor(k,id));
  switchUser('');toast('계정을 삭제했습니다.');
 }
 /* 저장 위치 안내 문구: 서버 모드일 때만 바꿔 끼운다(기본 HTML은 로컬 모드 문구) */
 const NOTES={
  auth:'닉네임과 일정은 팀이 만든 구글 시트에 저장돼요. 다른 기기에서도 같은 닉네임으로 로그인할 수 있어요. 비밀번호는 서버에서 해시로 바꿔 저장하지만 팀원이 시트에서 일정 데이터를 볼 수 있으니, 다른 서비스의 비밀번호는 쓰지 마세요. 비밀번호를 잊으면 찾을 수 없어요.',
  myNote:'로그인 정보와 일정은 팀이 만든 구글 시트에 저장되고, 이 기기에도 같은 데이터가 임시로 저장돼요. 보안 기능으로 보호되는 서비스가 아니니 중요한 개인정보는 넣지 마세요.',
- resetNote:'이 계정의 일정·약속·가용 시간을 초기화합니다. 서버에도 반영돼요.',
+ resetNote:'이 계정의 일정·약속·가용 시간·공부 기록(레벨 포함)을 초기화합니다. 서버에도 반영돼요.',
  apptNote:'개인 약속은 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 다만 계정 데이터로 구글 시트에는 저장돼요. 하루 안에 끝나는 약속만 입력할 수 있습니다.',
  termsLogin:'닉네임과 비밀번호로 가입·로그인하는 기능이며, 닉네임·비밀번호 해시·일정 데이터는 이 서비스를 운영하는 팀의 구글 시트에 저장되어 다른 기기에서도 같은 계정을 쓸 수 있습니다. 시트를 볼 수 있는 팀원은 닉네임과 일정 데이터를 열람할 수 있습니다. 로그인할 때 비밀번호가 서버(Google Apps Script)에 전달되어 해시로 바뀐 뒤 저장되므로 다른 서비스의 비밀번호를 쓰지 마세요. 프로토타입이라 보안 기능으로 보호되지 않으며, 비밀번호를 잊으면 복구할 수 없습니다.',
  privStore:'닉네임, 비밀번호 해시, 일정 데이터는 이 서비스를 운영하는 팀이 만든 구글 시트(Google Sheets)에 저장됩니다. 시트를 볼 수 있는 팀원이 이 데이터를 열람할 수 있습니다. 로그인할 때 비밀번호는 HTTPS로 서버(Google Apps Script)에 전달되어 해시로 바뀌며, 비밀번호 원문은 시트에 저장하지 않습니다. 같은 데이터가 이 기기에도 임시로 저장됩니다.',
- privDelete:'마이의 “데이터 전체 초기화”는 현재 계정의 일정, 약속, 가용 시간을 지우고 서버에도 반영합니다. “계정 삭제”는 시트에서 계정과 그 계정의 모든 데이터를 지웁니다. 이 기기에 임시 저장된 데이터는 브라우저의 사이트 데이터 삭제로 지워집니다.'
+ privDelete:'마이의 “데이터 전체 초기화”는 현재 계정의 일정, 약속, 가용 시간, 공부 기록(레벨 포함)을 지우고 서버에도 반영합니다. “계정 삭제”는 시트에서 계정과 그 계정의 모든 데이터를 지웁니다. 이 기기에 임시 저장된 데이터는 브라우저의 사이트 데이터 삭제로 지워집니다.'
 };
 function applyStorageNotes(){
  if(!Sync.on)return;
