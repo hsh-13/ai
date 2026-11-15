@@ -320,3 +320,7 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
 .intro-dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
 .intro-dots i.on{background:var(--accent);width:18px;border-radius:4px}
 .app-shell[data-view="intro"] .nav{display:none}
+/* v3.6: 홈 헤더의 사용법 버튼 */
+.help-btn{width:40px;height:40px;flex:none;align-self:flex-start;border:0;border-radius:50%;background:rgba(255,255,255,.2);display:grid;place-items:center;padding:0}
+.help-btn svg{width:23px;height:23px;fill:none;stroke:#fff;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.help-btn:active{background:rgba(255,255,255,.32)}

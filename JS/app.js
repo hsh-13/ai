@@ -406,10 +406,11 @@ function INTRO_ART(i){
 function renderIntro(){
  const el=$('introCard');if(!el)return;
  const S=INTRO_SLIDES(),s=S[introIdx],last=introIdx===S.length-1;
+ const sk=$('introSkip');if(sk)sk.textContent=user?'닫기':'건너뛰기'; // 로그인한 사람이 다시 볼 때는 "닫기"
  el.innerHTML=`<div class="intro-hero"><div class="intro-step">${introIdx+1} / ${S.length}</div><h1>${esc(s.t)}</h1></div>
  <div class="card intro-body"><div class="intro-art">${INTRO_ART(introIdx)}</div><p class="intro-p">${esc(s.p)}</p>${s.n?`<p class="intro-n">${esc(s.n)}</p>`:''}
  <div class="intro-dots" aria-hidden="true">${S.map((_,i)=>`<i class="${i===introIdx?'on':''}"></i>`).join('')}</div>
- <div class="row" style="gap:10px">${introIdx>0?'<button class="btn" onclick="introNext(-1)">이전</button>':''}<button class="btn primary grow" onclick="${last?'finishIntro()':'introNext(1)'}">${last?'시작하기':'다음'}</button></div></div>`;
+ <div class="row" style="gap:10px">${introIdx>0?'<button class="btn" onclick="introNext(-1)">이전</button>':''}<button class="btn primary grow" onclick="${last?'finishIntro()':'introNext(1)'}">${last?(user?'확인':'시작하기'):'다음'}</button></div></div>`;
 }
 /* ===== v3.3: 서버(구글 시트) 동기화 — AI_ENDPOINT가 있을 때만 켜진다. 비어 있으면 v3.2처럼 이 브라우저에만 저장한다 ===== */
 const TOKEN_KEY='aiStudyPlannerToken',SYNCMETA_KEY='aiStudyPlannerSync';
