@@ -8,7 +8,7 @@ const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시�
 const APPT_KEY='aiStudyPlannerAppts'; // v3.0: 개인 약속 [{id,title,date,start,end}] — 가용 시간 계산에만 쓰고 AI로 보내지 않는다
 const MAX_NOTICE=2000, AI_TIMEOUT_MS=10000; // v3.0: 공지 입력 길이 제한, AI 응답 대기 한도
 // v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
-const AI_ENDPOINT='';
+const AI_ENDPOINT='https://script.google.com/macros/s/AKfycbwaxw3JIuVVy4Oc-aPpK_Zk-CXYYHv0jyiCRQDpST7VfS1nNY4oMJbQcFwdRHYGMu30sA/exec';
 // v3.2: 저장소는 이 객체 한곳으로 모은다(localStorage). 구글 시트 연동 때는 이 객체의 구현만 서버 호출로 바꾸고, 화면·계산 코드는 건드리지 않는다.
 const Store={
  get(base){try{return JSON.parse(localStorage.getItem(K(base)))}catch(e){return null}},          // 현재 계정의 데이터 읽기
