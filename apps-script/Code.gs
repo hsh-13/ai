@@ -41,7 +41,18 @@ function extract_(text, today) {
     '"requirements":[{"text":80자 이내 요약,"evidence":원문에서 그대로 복사한 문장}]}\n' +
     '상대 날짜(다음 주 금요일 등)는 날짜로 바꾸지 말고 relative_week/relative_days로 표현만 구조화한다. 요구사항은 최대 8개.\n' +
     '공지:\n"""\n' + text + '\n"""';
-  return callGemini_(prompt);
+  
+var result = callGemini_(prompt);
+
+// Gemini가 배열로 반환하는 경우 단일 객체로 변환
+if (Array.isArray(result)) {
+  if (result.length !== 1) {
+    return { error: 'invalid_ai_shape' };
+  }
+  result = result[0];
+}
+
+return result;
 }
 
 function comment_(req) {
