@@ -6,7 +6,7 @@ const USER_KEY='aiStudyPlannerUser'; // 현재 로그인한 닉네임(이 브라
 const ACCOUNTS_KEY='aiStudyPlannerAccounts'; // 이 브라우저의 로컬 계정 {닉네임:{salt,hash}}
 const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시간 수정
 const APPT_KEY='aiStudyPlannerAppts'; // v3.0: 개인 약속 [{id,title,date,start,end}] — 가용 시간 계산에만 쓰고 AI로 보내지 않는다
-const MAX_NOTICE=2000, AI_TIMEOUT_MS=10000; // v3.0: 공지 입력 길이 제한, AI 응답 대기 한도
+const MAX_NOTICE=2000, AI_TIMEOUT_MS=25000; // v3.0: 공지 입력 길이 제한, AI 응답 대기 한도
 // v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
 const AI_ENDPOINT='https://script.google.com/macros/s/AKfycbwaxw3JIuVVy4Oc-aPpK_Zk-CXYYHv0jyiCRQDpST7VfS1nNY4oMJbQcFwdRHYGMu30sA/exec';
 // v3.2: 저장소는 이 객체 한곳으로 모은다(localStorage). 구글 시트 연동 때는 이 객체의 구현만 서버 호출로 바꾸고, 화면·계산 코드는 건드리지 않는다.
@@ -763,19 +763,21 @@ async function extractNotice(){
  runAiExtract(text);
 }
 async function runAiExtract(text){
- setPanel('loading','<div class="card"><div class="card-title"><span>공지 분석 중</span><span class="tag ai">AI</span></div><div class="progress"><i style="width:60%"></i></div><p class="sub" style="margin:10px 0 0">공지에서 일정·요구사항을 읽고 있어요. 최대 10초까지 기다립니다.</p></div><button class="btn full" onclick="cancelExtract()">취소</button>');
+ setPanel('loading','<div class="card"><div class="card-title"><span>공지 분석 중</span><span class="tag ai">AI</span></div><div class="progress"><i style="width:60%"></i></div><p class="sub" style="margin:10px 0 0">공지에서 일정·요구사항을 읽고 있어요. 최대 25초까지 기다립니다.</p></div><button class="btn full" onclick="cancelExtract()">취소</button>');
  const ctl=new AbortController();extractCtl=ctl;let timedOut=false;const timer=setTimeout(()=>{timedOut=true;ctl.abort()},AI_TIMEOUT_MS);
  try{
   const x=await aiCall('extract',{text,today:isoDate(new Date())},ctl.signal);clearTimeout(timer);
   if(extractCtl!==ctl)return; // 사용자가 취소함
+  if(!x||typeof x!=='object')throw new Error('서버 응답이 JSON 객체가 아님');
+  if(x.error)throw new Error('서버 오류 코드: '+x.error+(x.detail?' / '+String(x.detail).slice(0,100):''));
   const raw=x&&Array.isArray(x.items)&&x.items.length?x.items:[x]; // 이전 형식(일정 객체 하나)도 받는다
   const ok=raw.filter(validExtract3).slice(0,MAX_QUEUE);
-  if(!ok.length)throw new Error('형식 불일치');
+  if(!ok.length)throw new Error('형식 불일치: 받은 일정 '+raw.length+'개 중 유효 0개, 첫 항목='+JSON.stringify(raw[0]).slice(0,160));
   extractCtl=null;noticeQ={items:ok,idx:0,text,skipped:raw.length-raw.filter(validExtract3).length,added:0};
   showDraft(buildDraft(ok[0],text,'AI'));
  }catch(e){
   clearTimeout(timer);if(extractCtl!==ctl)return;extractCtl=null;
-  showFailed(timedOut?'응답 시간이 초과되었습니다.':'AI 응답을 사용할 수 없거나 형식이 맞지 않습니다.');
+  showFailed(timedOut?'응답 시간이 초과되었습니다.':'AI 응답을 사용할 수 없거나 형식이 맞지 않습니다. [원인: '+String((e&&e.message)||e).slice(0,220)+']');
  }
 }
 function cancelExtract(){const c=extractCtl;extractCtl=null;noticeQ=null;if(c)c.abort();setPanel('input')}
