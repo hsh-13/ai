@@ -307,15 +307,18 @@ function renderStepper(state){
  const n={input:1,loading:1,failed:1,result:2,steps:3}[state]||1,el=$('stepper');if(!el)return;
  el.innerHTML=['붙여넣기','확인','단계'].map((l,i)=>`<div class="st ${i+1<n?'done':i+1===n?'on':''}" ${i+1===n?'aria-current="step"':''}><b>${i+1<n?CHK:i+1}</b>${l}</div>`).join('<i class="stline"></i>');
 }
+let noticeQ=null; // 공지 하나에서 여러 일정이 나왔을 때 하나씩 확인·추가하는 대기열 {items,idx,text,skipped,added}
+const MAX_QUEUE=5;
 function setPanel(state,html){const pi=$('pasteInput'),ep=$('extractPanel');if(!pi||!ep)return;pasteState=state;pi.classList.toggle('hidden',state!=='input');ep.innerHTML=state==='input'?'':(html||'');renderStepper(state);if(state!=='input')window.scrollTo(0,0)}
 function showDraft(d){
  draft=d;
  const reqs=d.reqs.length?d.reqs.map(r=>`<div class="req"><b>${esc(r.text)}</b><div class="q">원문: “${esc(r.evidence||'-')}” <span class="tag ${r.ok?'good':'bad'}">${r.ok?'근거 확인됨':'근거 없음'}</span></div></div>`).join(''):'<p class="small muted" style="margin:0">공지에서 요구사항을 찾지 못했어요.</p>';
  const flags=d.flags.length?`<div class="flag"><b>확인 필요 ${d.flags.length}건</b><ul>${d.flags.map(f=>`<li>${esc(f)}</li>`).join('')}</ul></div>`:'';
- setPanel('result',`<div class="row" style="margin:4px 0 12px;align-items:flex-start">${tagOf(d.mode)}<span class="small muted grow">${d.mode==='AI'?'AI가 추출한 결과예요.':'규칙으로 추출한 결과예요(AI 아님).'} 확인하고 틀린 곳을 고쳐 주세요.</span></div>${flags}
+ const multi=noticeQ&&noticeQ.items.length>1,banner=multi?`<div class="notice" role="status"><b>이 공지에서 일정 ${noticeQ.items.length}개를 찾았어요 · ${noticeQ.idx+1}/${noticeQ.items.length}</b><br>하나씩 확인하고 추가해요. 필요 없는 일정은 건너뛸 수 있어요.${noticeQ.skipped?` 형식이 맞지 않아 ${noticeQ.skipped}개는 제외했어요.`:''}</div>`:'';
+ setPanel('result',`${banner}<div class="row" style="margin:4px 0 12px;align-items:flex-start">${tagOf(d.mode)}<span class="small muted grow">${d.mode==='AI'?'AI가 추출한 결과예요.':'규칙으로 추출한 결과예요(AI 아님).'} 확인하고 틀린 곳을 고쳐 주세요.</span></div>${flags}
  <div class="card"><div class="field" style="margin-top:0"><label for="dTitle">일정명</label><input id="dTitle" value="${esc(d.title)}" maxlength="40"></div><div class="grid2"><div class="field" style="margin-bottom:0"><label for="dType">종류</label><select id="dType">${TYPES.map(t=>`<option ${t===d.type?'selected':''}>${t}</option>`).join('')}</select></div><div class="field" style="margin-bottom:0"><label for="dDate">마감 날짜</label><input id="dDate" type="date" value="${d.date}"></div></div>${d.rel?'<p class="small" style="margin:8px 0 0"><span class="tag rule">규칙 계산</span> 상대 날짜를 코드가 계산했어요.</p>':''}${d.ev?`<p class="small muted" style="margin:8px 0 0">날짜 원문: “${esc(d.ev)}”</p>`:''}<div class="row" style="margin-top:12px;flex-wrap:wrap;gap:6px"><span class="tag acc">중요도 ${d.importance}</span><span class="tag acc">예상 ${effortLabel(d.effort)}</span></div></div>
  <div class="card"><h3>요구사항 <span class="small muted" style="font-weight:500">원문 근거와 함께</span></h3>${reqs}</div>
- <div class="actions"><button class="btn primary" onclick="toSteps()">다음: 단계 제안 보기</button><button class="btn" onclick="backToInput()">공지 다시 편집</button></div>`);
+ <div class="actions"><button class="btn primary" onclick="toSteps()">다음: 단계 제안 보기</button>${multi?'<button class="btn" onclick="skipQueued()">이 일정 건너뛰기</button>':''}<button class="btn" onclick="backToInput()">공지 다시 편집</button></div>`);
 }
 // 단계 추가 전에, 지금 일정에 이 단계들을 얹으면 어느 날 배정되는지 코드로 미리 계산한다.
 function previewAlloc(d){
@@ -339,8 +342,11 @@ function confirmAdd(withSteps){
  const steps=withSteps?d.steps.filter(x=>x.on).map(x=>({id:x.id,name:x.name,h:x.h,src:x.src,done:false})):[];
  const sum=steps.reduce((a,x)=>a+x.h,0),t={id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),title:d.title,type:d.type,date:d.date,importance:d.importance,effort:steps.length?nearestEffort(sum*60):d.effort,status:'시작 전',from:d.mode,reqs:d.reqs.map(r=>({text:r.text,evidence:r.evidence}))};
  if(steps.length)t.steps=steps;
- tasks.push(t);persist();focusDate(d.date);draft=null;$('noticeInput').value='';updateNoticeCount();setPanel('input');navigate('plan');
- toast(steps.length?`일정과 단계 ${steps.length}개를 추가했어요.`:'일정을 추가했어요.');
+ tasks.push(t);persist();focusDate(d.date);
+ const msg=steps.length?`일정과 단계 ${steps.length}개를 추가했어요.`:'일정을 추가했어요.';
+ if(noticeQ){noticeQ.added++;if(nextQueued()){toast(`${msg} 다음 일정(${noticeQ.idx+1}/${noticeQ.items.length})을 확인해 주세요.`);return}const n=finishQueued();toast(n>1?`일정 ${n}개를 추가했어요.`:msg);return}
+ draft=null;$('noticeInput').value='';updateNoticeCount();setPanel('input');navigate('plan');
+ toast(msg);
 }
 
 /* ===== 데이터 관리 ===== */
@@ -743,7 +749,7 @@ function buildDraft(o,text,mode){
   if(dd.date<today)flags.push('이미 지난 날짜입니다.');
  }
  const dates=new Set((text.match(new RegExp(DATE_RE.source,'g'))||[]).map(normTxt));
- if(dates.size>1)flags.push('공지에 날짜가 여러 개 있습니다. 마감이 맞는지 확인해 주세요.');
+ if(dates.size>1&&!(noticeQ&&noticeQ.items.length>1))flags.push('공지에 날짜가 여러 개 있습니다. 마감이 맞는지 확인해 주세요.');
  const reqs=o.requirements.map(r=>({text:r.text.trim(),evidence:r.evidence,ok:inText(r.evidence,text)}));
  if(reqs.some(r=>!r.ok))flags.push('원문에서 근거를 찾지 못한 요구사항이 있습니다.');
  return {mode,title:o.title.trim().slice(0,40),type:o.type,importance:o.importance,effort:Number(o.effort),date:dd?dd.date:'',ev:o.deadline&&o.deadline.evidence||'',rel:!!(dd&&dd.rel),reqs,flags,steps:null};
@@ -752,7 +758,7 @@ async function extractNotice(){
  const text=$('noticeInput').value.trim();
  if(!text){toast('공지 내용을 붙여넣어 주세요.');return}
  if(text.length>MAX_NOTICE){toast('공지는 2,000자 이내로 붙여넣어 주세요.');return}
- lastNotice=text;
+ lastNotice=text;noticeQ=null;
  if(!AI_ENDPOINT){showDraft(buildDraft(mockExtract3(text),text,'규칙'));return}
  runAiExtract(text);
 }
@@ -762,19 +768,38 @@ async function runAiExtract(text){
  try{
   const x=await aiCall('extract',{text,today:isoDate(new Date())},ctl.signal);clearTimeout(timer);
   if(extractCtl!==ctl)return; // 사용자가 취소함
-  if(!validExtract3(x))throw new Error('형식 불일치');
-  extractCtl=null;showDraft(buildDraft(x,text,'AI'));
+  const raw=x&&Array.isArray(x.items)&&x.items.length?x.items:[x]; // 이전 형식(일정 객체 하나)도 받는다
+  const ok=raw.filter(validExtract3).slice(0,MAX_QUEUE);
+  if(!ok.length)throw new Error('형식 불일치');
+  extractCtl=null;noticeQ={items:ok,idx:0,text,skipped:raw.length-raw.filter(validExtract3).length,added:0};
+  showDraft(buildDraft(ok[0],text,'AI'));
  }catch(e){
   clearTimeout(timer);if(extractCtl!==ctl)return;extractCtl=null;
   showFailed(timedOut?'응답 시간이 초과되었습니다.':'AI 응답을 사용할 수 없거나 형식이 맞지 않습니다.');
  }
 }
-function cancelExtract(){const c=extractCtl;extractCtl=null;if(c)c.abort();setPanel('input')}
+function cancelExtract(){const c=extractCtl;extractCtl=null;noticeQ=null;if(c)c.abort();setPanel('input')}
 function showFailed(reason){
  setPanel('failed',`<div class="card"><div class="card-title"><span>추출에 실패했습니다</span></div><p class="sub" style="margin:0">${escapeHtml(reason)} 붙여넣은 내용은 그대로 남아 있습니다. AI 응답이 약속된 형식이 아니면 결과를 쓰지 않고 이 화면으로 옵니다.</p></div><button class="btn primary full" onclick="runAiExtract(lastNotice)">다시 시도</button><div class="card"><div class="card-title"><span>규칙 기반으로 대신 추출</span><span class="tag rule">규칙</span></div><p class="sub" style="margin:0 0 8px">날짜가 단순한 공지만 읽을 수 있고 정확도가 낮을 수 있습니다. 결과에 “규칙 기반”으로 표시됩니다.</p><button class="btn small" onclick="useRuleExtract()">규칙 기반으로 추출</button></div><button class="btn full" onclick="backToInput()">공지 다시 편집</button><button class="btn full" onclick="openAdd()">직접 입력으로 전환</button>`);
 }
-function useRuleExtract(){showDraft(buildDraft(mockExtract3(lastNotice),lastNotice,'규칙'))}
-function backToInput(){setPanel('input')}
+function useRuleExtract(){noticeQ=null;showDraft(buildDraft(mockExtract3(lastNotice),lastNotice,'규칙'))}
+function backToInput(){const n=noticeQ&&noticeQ.added;noticeQ=null;setPanel('input');if(n)toast(`이미 추가한 일정 ${n}개는 그대로 남아 있어요.`)}
+// 여러 일정 공지: 다음 일정으로 넘어간다. 마지막이면 끝내고 일정 화면으로 간다.
+function nextQueued(){
+ const q=noticeQ;if(!q)return false;
+ if(q.idx<q.items.length-1){q.idx++;draft=null;showDraft(buildDraft(q.items[q.idx],q.text,'AI'));return true}
+ return false;
+}
+function finishQueued(){
+ const added=noticeQ?noticeQ.added:0;noticeQ=null;draft=null;$('noticeInput').value='';updateNoticeCount();setPanel('input');
+ if(added)navigate('plan');
+ return added;
+}
+function skipQueued(){
+ if(!noticeQ)return;
+ if(nextQueued()){toast(`건너뛰었어요. 다음 일정(${noticeQ.idx+1}/${noticeQ.items.length})을 확인해 주세요.`);return}
+ const n=finishQueued();toast(n?`일정 ${n}개를 추가했어요.`:'추가한 일정이 없어요.');
+}
 function tagOf(mode){return mode==='AI'?'<span class="tag ai">AI</span>':'<span class="tag rule">규칙 기반</span>'}
 /* --- 단계 제안: 요구사항을 고정된 단계 유형에 연결한다. 공지에 없는 단계는 만들지 않고, 시간은 모두 "추정"이다. --- */
 const BASE_STEPS={'과제':[['자료 조사',.25],['작성',.75]],'시험':[['범위 정리',.3],['문제 풀이',.5],['복습',.2]],'발표':[['자료 조사',.3],['슬라이드 제작',.45],['발표 연습',.25]],'팀 프로젝트':[['역할·일정 정리',.15],['작업',.7],['취합·점검',.15]]};
