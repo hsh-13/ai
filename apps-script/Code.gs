@@ -12,6 +12,7 @@
  */
 var MODEL = 'gemini-3.5-flash-lite';
 var MAX_TEXT = 2000;      // 입력 길이 제한(프론트와 동일)
+var MAX_ITEMS = 5;       // 공지 하나에서 받는 일정 수 상한(화면에서 하나씩 확인하므로 작게 둔다)
 var DAILY_LIMIT = 200;    // 하루 전체 요청 한도(남용·비용 방지용 임의 값)
 
 var ACCOUNT_TASKS_ = { signup: 1, login: 1, load: 1, save: 1, logout: 1, remove: 1 };
@@ -34,25 +35,32 @@ function extract_(text, today) {
   var prompt =
     '다음은 대학 수업 공지다. 공지에 적힌 내용만 근거로 JSON을 만들어라. 추측하지 말고, 없으면 null 또는 빈 배열로 둔다.\n' +
     '기준일(오늘): ' + today + '\n' +
-    '형식: {"title":문자열,"type":"과제|시험|발표|팀 프로젝트","importance":"높음|보통|낮음","effort":30|60|120|180|300(분),' +
+    '형식: {"items":[일정,...]}. 일정 하나의 형식은 {"title":문자열,"type":"과제|시험|발표|팀 프로젝트","importance":"높음|보통|낮음","effort":30|60|120|180|300(분),' +
     '"deadline":null 또는 {"kind":"absolute","date":"YYYY-MM-DD","evidence":원문 그대로의 날짜 표현} ' +
     '또는 {"kind":"relative_week","weekOffset":0|1|2,"weekday":0(월)~6(일),"evidence":원문 표현} ' +
     '또는 {"kind":"relative_days","days":0~60,"evidence":원문 표현},' +
     '"requirements":[{"text":80자 이내 요약,"evidence":원문에서 그대로 복사한 문장}]}\n' +
-    '상대 날짜(다음 주 금요일 등)는 날짜로 바꾸지 말고 relative_week/relative_days로 표현만 구조화한다. 요구사항은 최대 8개.\n' +
+    '상대 날짜(다음 주 금요일 등)는 날짜로 바꾸지 말고 relative_week/relative_days로 표현만 구조화한다. 요구사항은 일정마다 최대 8개.\n' +
+    '공지에 일정(과제·시험·발표 등)이 여러 개 있으면 일정마다 items에 하나씩 넣는다(최대 ' + MAX_ITEMS + '개, 마감이 가까운 순). 일정이 하나뿐이거나 뚜렷한 일정이 없으면 공지 전체를 일정 하나로 보고 items에 하나만 넣는다(마감을 모르면 deadline은 null).\n' +
     '공지:\n"""\n' + text + '\n"""';
   
 var result = callGemini_(prompt);
 
-// Gemini가 배열로 반환하는 경우 단일 객체로 변환
-if (Array.isArray(result)) {
-  if (result.length !== 1) {
-    return { error: 'invalid_ai_shape' };
-  }
-  result = result[0];
-}
-
-return result;
+// 응답을 {items:[...]} 형태로 맞춘다. 모델이 배열이나 일정 객체 하나로 답해도 받아 준다.
+var list;
+if (Array.isArray(result)) list = result;
+else if (result && Array.isArray(result.items)) list = result.items;
+else if (result && typeof result === 'object' && !result.error) list = [result];
+else return result; // 오류 응답 등은 그대로 돌려준다
+list = list.filter(function (x) { return x && typeof x === 'object' && !Array.isArray(x); });
+if (!list.length) return { error: 'invalid_ai_shape' };
+var omitted = Math.max(0, list.length - MAX_ITEMS);
+list = list.slice(0, MAX_ITEMS);
+var out = {};
+for (var k in list[0]) if (k !== 'items') out[k] = list[0][k]; // 이전 버전 앱은 최상위만 읽으므로 첫 일정을 최상위에도 둔다
+out.items = list;
+out.omitted = omitted;
+return out;
 }
 
 function comment_(req) {
