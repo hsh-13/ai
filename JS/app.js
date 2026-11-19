@@ -20,6 +20,93 @@ const Store={
  accounts:{get(){try{return JSON.parse(localStorage.getItem(ACCOUNTS_KEY))||{}}catch(e){return {}}},set(a){localStorage.setItem(ACCOUNTS_KEY,JSON.stringify(a))}}
 };
 const GAME_KEY='aiStudyPlannerGame',TIMER_KEY='aiStudyPlannerTimer';
+
+/* ===== 공부 게임 2~3단계: 고양이 모으기 + 액세서리 =====
+ * 규칙: 레벨이 오를 때마다 아직 없는 보상 1개를 상자로 받는다. 보상은 고양이 2마리와 액세서리 15개, 모두 17개다(회색 고양이는 처음부터 가진다).
+ *  확률은 "어떤 보상이 나오는지"에만 쓰고, 경험치·계획·가용 시간 계산에는 영향이 없다. 희귀도 비율 70/25/5는 팀이 임의로 정한 값이다.
+ *  보상은 레벨업 순간 정해 pending에 저장한다(새로고침해도 다시 뽑을 수 없다). rewardLv = 보상을 이미 처리한 최고 레벨.
+ * 그림: 고양이 스프라이트는 Last tick의 "32x32 Pixel kittens Cats - Animated NPC" 무료 팩(itch.io)이다. 사용 조건과 출처는 assets/CREDITS.md 참고.
+ * 이 블록은 아래 let 초기화(loadGame)보다 먼저 있어야 한다(const 초기화 순서). */
+const SLOTS=[{key:'cat',name:'고양이'},{key:'head',name:'머리'},{key:'face',name:'얼굴'},{key:'back',name:'등'}];
+const RARITY=[{k:'일반',w:70},{k:'희귀',w:25},{k:'에픽',w:5}];
+const ITEMS=[
+ {id:'cat-gray',slot:'cat',file:'gray',name:'회색 고양이',rarity:'일반',starter:true},
+ {id:'cat-ginger',slot:'cat',file:'ginger',name:'생강 고양이',rarity:'희귀'},
+ {id:'cat-white',slot:'cat',file:'white',name:'흰 고양이',rarity:'희귀'},
+ {id:'bow-pink',slot:'head',file:'bow-pink',name:'분홍 리본',rarity:'일반'},
+ {id:'bow-red',slot:'head',file:'bow-red',name:'빨강 리본',rarity:'일반'},
+ {id:'bow-gold',slot:'head',file:'bow-gold',name:'금색 리본',rarity:'일반'},
+ {id:'bow-pink2',slot:'head',file:'bow-pink2',name:'분홍 옆 리본',rarity:'일반'},
+ {id:'bow-blue',slot:'head',file:'bow-blue',name:'파랑 옆 리본',rarity:'일반'},
+ {id:'bow-green',slot:'head',file:'bow-green',name:'초록 옆 리본',rarity:'일반'},
+ {id:'santa1',slot:'head',file:'santa1',name:'산타 모자',rarity:'희귀'},
+ {id:'santa2',slot:'head',file:'santa2',name:'푹신 산타 모자',rarity:'희귀'},
+ {id:'antler-red',slot:'head',file:'antler-red',name:'빨강 뿔 머리띠',rarity:'희귀'},
+ {id:'antler-green',slot:'head',file:'antler-green',name:'초록 뿔 머리띠',rarity:'희귀'},
+ {id:'nimbus',slot:'head',file:'nimbus',name:'천사링',rarity:'에픽'},
+ {id:'glasses-gold',slot:'face',file:'glasses-gold',name:'금색 하트 안경',rarity:'희귀'},
+ {id:'glasses-red',slot:'face',file:'glasses-red',name:'빨강 하트 안경',rarity:'희귀'},
+ {id:'wings',slot:'back',file:'wings',name:'천사 날개',rarity:'에픽'},
+ {id:'cupid',slot:'back',file:'cupid',name:'큐피드',rarity:'에픽'}
+];
+const ITEM_BY_ID={};ITEMS.forEach(i=>{ITEM_BY_ID[i.id]=i});
+/* 스프라이트: 시트 한 장은 32x32 칸 11열 x 53행이고 행마다 동작 하나다(r=행, n=프레임 수, ms=프레임 간격).
+ * 액세서리 시트는 고양이 시트와 칸 배치가 같아서, 같은 칸을 겹쳐 놓기만 하면 모든 동작에서 위치가 맞는다. */
+const SPR_ANIM={sit:{r:0,n:1,ms:1000},wash:{r:36,n:9,ms:150},yawn:{r:32,n:8,ms:170},scratch:{r:39,n:11,ms:130},meow:{r:28,n:3,ms:260},sleep:{r:12,n:2,ms:700}};
+const IDLE_SET=['wash','yawn','scratch','meow'];
+function sprHtml(eq,opt){ // eq={cat,head,face,back}(장착한 아이템 id). opt.anim 없으면 가만히 앉은 그림, 'idle'이면 가끔 움직임
+ opt=opt||{};eq=eq||{};
+ const cat=ITEM_BY_ID[eq.cat]&&ITEM_BY_ID[eq.cat].slot==='cat'?ITEM_BY_ID[eq.cat]:ITEM_BY_ID['cat-gray'];
+ const acc=['back','face','head'].map(k=>ITEM_BY_ID[eq[k]]).filter(i=>i&&i.slot!=='cat');
+ const layers=[{dir:'assets/cats/',file:cat.file}].concat(acc.map(i=>({dir:'assets/acc/',file:i.file})));
+ return `<span class="spr"${opt.anim?` data-anim="${opt.anim}"`:''} style="--cell:${opt.cell||96}px;--fx:0;--fy:0" role="img" aria-label="${cat.name}">`+layers.map(l=>`<i style="background-image:url(${l.dir}${l.file}.png)"></i>`).join('')+'</span>';
+}
+function sprSet(el,name,f){el.style.setProperty('--fx',f);el.style.setProperty('--fy',SPR_ANIM[name].r)}
+function sprStep(){
+ if(document.hidden)return;
+ const now=Date.now();
+ document.querySelectorAll('.spr[data-anim]').forEach(el=>{
+  const mode=el.dataset.anim;let s=el._s;
+  if(!s||s.mode!==mode)s=el._s={mode,cur:'sit',f:0,t:0,wait:false};
+  if(now<s.t)return;
+  if(mode==='idle'){ // 앉아서 몇 초 쉬다가 가끔 씻기·하품·긁기·야옹 중 하나를 한 번 한다
+   if(s.cur==='sit'){
+    if(!s.wait){s.wait=true;sprSet(el,'sit',0);s.t=now+2500+Math.random()*3500;return}
+    s.wait=false;s.cur=IDLE_SET[Math.floor(Math.random()*IDLE_SET.length)];s.f=0;
+   }
+   const a=SPR_ANIM[s.cur];
+   if(s.f>=a.n){s.cur='sit';s.wait=false;sprSet(el,'sit',0);s.t=now+1500;return}
+   sprSet(el,s.cur,s.f++);s.t=now+a.ms;return;
+  }
+  const a=SPR_ANIM[mode]||SPR_ANIM.sit;
+  sprSet(el,SPR_ANIM[mode]?mode:'sit',s.f%a.n);s.f++;s.t=now+a.ms; // 정해진 동작은 계속 반복
+ });
+}
+if(!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))setInterval(sprStep,60); // 움직임 줄이기 설정이면 가만히 앉은 그림만 보여 준다
+const BOX_SVG='<svg viewBox="0 0 96 96" aria-hidden="true"><rect x="18" y="48" width="60" height="40" rx="6" fill="#E8A33D"/><rect x="43" y="48" width="10" height="40" fill="#C2394F"/><g class="bx-lid"><rect x="12" y="30" width="72" height="20" rx="5" fill="#F2B544"/><rect x="43" y="30" width="10" height="20" fill="#C2394F"/><path d="M48 30c-7-13-20-11-16-4 3 5 11 4 16 4zM48 30c7-13 20-11 16-4-3 5-11 4-16 4z" fill="none" stroke="#C2394F" stroke-width="4" stroke-linecap="round"/></g></svg>';
+// 저장 데이터 정리: 이전 버전(items 등이 없는 데이터)도 읽는다. rewardLv가 없으면 1로 보고, 이미 오른 레벨만큼 보상을 받는다.
+function normGame(g){
+ g=g&&typeof g==='object'?g:{};
+ const ids=a=>Array.isArray(a)?a.filter((x,i)=>ITEM_BY_ID[x]&&a.indexOf(x)===i):[];
+ const items=ids(g.items);if(!items.includes('cat-gray'))items.unshift('cat-gray');
+ const pending=ids(g.pending).filter(x=>!items.includes(x)&&!ITEM_BY_ID[x].starter),equipped={};
+ SLOTS.forEach(sl=>{const v=g.equipped&&g.equipped[sl.key];if(v&&items.includes(v)&&ITEM_BY_ID[v].slot===sl.key)equipped[sl.key]=v});
+ if(!equipped.cat)equipped.cat='cat-gray';
+ return {v:3,archivedMin:Number(g.archivedMin)||0,bonusXp:Number(g.bonusXp)||0,sessions:Array.isArray(g.sessions)?g.sessions:[],items,pending,equipped,rewardLv:Math.max(1,Math.floor(Number(g.rewardLv))||1)};
+}
+function pickItem(g){ // 아직 없는 보상 중에서, 남아 있는 희귀도끼리 비율을 다시 계산해 뽑는다
+ const have=g.items.concat(g.pending),left=ITEMS.filter(i=>!i.starter&&!have.includes(i.id));
+ if(!left.length)return null;
+ const tiers=RARITY.filter(r=>left.some(i=>i.rarity===r.k));
+ let x=Math.random()*tiers.reduce((a,r)=>a+r.w,0),t=tiers[tiers.length-1];
+ for(const r of tiers){if(x<r.w){t=r;break}x-=r.w}
+ const c=left.filter(i=>i.rarity===t.k);return c[Math.floor(Math.random()*c.length)].id;
+}
+function grantRewards(g){ // 오른 레벨마다 1개씩 pending에 넣는다. 바뀌었으면 true
+ const lv=levelInfo(xpTotal(g)).level;let changed=false;
+ while(g.rewardLv<lv){g.rewardLv++;changed=true;const id=pickItem(g);if(id)g.pending.push(id)}
+ return changed;
+}
 let user=loadUser(), authMode='login', tasks=loadTasks(), avail=loadAvail(), ovr=loadOvr(), appts=loadAppts(), game=loadGame(), timer=loadTimer(), timerResult=null, draft=null, extractCtl=null, lastNotice='', formTab='direct', currentView='today', lastMain='today', selectedDate=isoDate(new Date()), weekStart=isoDate(startOfWeek(new Date())), editingId=null, listFilter='전체', listSort='due', pasteState='input', commentCache=null;
 const esc=s=>escapeHtml(s);
 const CHK='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
@@ -44,7 +131,7 @@ function toast(msg){const el=$('toast');el.textContent=msg;el.classList.add('sho
 
 /* ===== v3.0: 화면 이동 — 하단 탭 5개(오늘 / 계획 / ＋ / 일정 / 마이) ===== */
 const MAIN=['today','plan','list','settings'];
-const NAV_OF={timer:'today',today:'today',plan:'plan',list:'list',detail:'list',settings:'settings',terms:'settings',privacy:'settings'};
+const NAV_OF={timer:'today',closet:'today',today:'today',plan:'plan',list:'list',detail:'list',settings:'settings',terms:'settings',privacy:'settings'};
 function renderView(v){
  if(v==='today')renderToday();
  else if(v==='plan')renderPlan();
@@ -54,6 +141,7 @@ function renderView(v){
  else if(v==='auth')renderAuth();
  else if(v==='intro')renderIntro();
  else if(v==='timer')renderTimer();
+ else if(v==='closet')renderCloset();
 }
 function navigate(view){
  if(view==='home')view='today';
@@ -367,8 +455,8 @@ function confirmReset(){
  * 경험치 = 공부한 분(1분 = 1 XP). 세션 기록에서 계산하므로 저장값과 어긋나지 않는다.
  * 상한·최소 시간·레벨 곡선의 숫자는 팀이 임의로 정한 값이다. 2~3단계(드랍·이벤트·상자)는 bonusXp와 items 필드를 더해 확장한다. */
 const MAX_SESSION_MIN=120,MIN_SESSION_MIN=1,KEEP_SESSIONS=150; // 한 번에 인정하는 최대 시간(분) / 이보다 짧으면 기록하지 않음 / 저장 크기 때문에 상세 기록은 최근 150건만 유지
-function emptyGame(){return {v:1,archivedMin:0,bonusXp:0,sessions:[]}}
-function loadGame(){try{const g=Store.get(GAME_KEY);return g&&Array.isArray(g.sessions)?{v:1,archivedMin:Number(g.archivedMin)||0,bonusXp:Number(g.bonusXp)||0,sessions:g.sessions}:emptyGame()}catch(e){return emptyGame()}}
+function emptyGame(){return normGame({})}
+function loadGame(){try{const g=Store.get(GAME_KEY);if(!(g&&Array.isArray(g.sessions)))return emptyGame();const n=normGame(g);if(grantRewards(n))Store.setLocal(GAME_KEY,n);return n}catch(e){return emptyGame()}} // 보상은 받은 즉시 저장해 다시 뽑을 수 없게 한다(Sync는 초기화 전이라 setLocal)
 function loadTimer(){try{const t=Store.get(TIMER_KEY);return t&&Number(t.start)>0?t:null}catch(e){return null}}
 function persistGame(){if(user)Store.set(GAME_KEY,game)}
 function totalMin(g){g=g||game;return (g.archivedMin||0)+g.sessions.reduce((a,s)=>a+s.min,0)}
@@ -400,11 +488,73 @@ function stopTimer(){
  timer=null;Store.del(TIMER_KEY);syncTick();
  if(min<MIN_SESSION_MIN){timerResult={min:0};renderTimer();return}
  addSession({id:crypto.randomUUID?crypto.randomUUID():String(end),taskId:t.taskId||null,start:t.start,end,min});
+ grantRewards(game);persistGame(); // 레벨이 오르면 아이템이 든 상자를 받는다
  const after=levelInfo(xpTotal()),tk=tasks.find(x=>x.id===t.taskId);
  timerResult={min,raw,capped:raw>MAX_SESSION_MIN,up:after.level>before.level,level:after.level,title:tk?tk.title:''};
  renderTimer();
 }
 function closeTimerResult(){timerResult=null;navigate('today')}
+/* ----- 상자 열기: 공부 중에는 열 수 없고, 종료·휴식 상태(타이머가 멈춘 화면)에서만 연다 ----- */
+let boxUi=null; // {phase:'shake'|'reveal', id, auto}
+const rarCls=r=>r==='에픽'?'epic':r==='희귀'?'rare':'norm';
+function openBox(){
+ if(timer||boxUi||!game.pending.length)return;
+ const id=game.pending.shift(),it=ITEM_BY_ID[id];
+ game.items.push(id);let auto=false;
+ if(it.slot!=='cat'&&!game.equipped[it.slot]){game.equipped[it.slot]=id;auto=true} // 액세서리는 그 칸이 비어 있으면 바로 입힌다. 고양이는 묻고 바꾼다
+ persistGame();
+ const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+ boxUi={phase:reduce?'reveal':'shake',id,auto};showBox();
+ if(!reduce)setTimeout(()=>{if(boxUi&&boxUi.id===id&&boxUi.phase==='shake'){boxUi.phase='reveal';showBox()}},1100);
+}
+function boxNext(){boxUi=null;showBox();if(currentView==='today')renderGameCard()}
+function equipFromBox(){if(boxUi){const it=ITEM_BY_ID[boxUi.id];if(it&&it.slot==='cat'){game.equipped.cat=it.id;persistGame()}}boxNext()}
+function showBox(){if(currentView==='timer')renderTimer();else if(currentView==='closet')renderCloset()}
+function boxArea(){
+ if(boxUi){
+  const it=ITEM_BY_ID[boxUi.id];
+  if(boxUi.phase==='shake')return `<div class="boxcard"><div class="boxwrap shake">${BOX_SVG}</div><p class="tsub" role="status">상자를 여는 중…</p></div>`;
+  const pv=Object.assign({},game.equipped);pv[it.slot]=it.id; // 새로 얻은 것을 지금 고양이에게 입혀 보여 준다
+  const isCat=it.slot==='cat',slotName=SLOTS.find(x=>x.key===it.slot).name;
+  const note=isCat?'새 고양이를 만났어요':slotName+(boxUi.auto?' · 바로 입혔어요':' · 꾸미기에서 바꿀 수 있어요');
+  return `<div class="boxcard reveal" role="status"><div class="rvav">${sprHtml(pv,{cell:136,anim:'meow'})}</div><span class="rar" data-r="${it.rarity}">${it.rarity}</span><h3 class="rvname">${it.name}</h3><p class="tsub">${note}</p>${isCat?`<button class="btn primary full" onclick="equipFromBox()">이 고양이로 바꾸기</button><button class="btn full" style="margin-top:8px" onclick="boxNext()">나중에</button>`:`<button class="btn primary full" onclick="boxNext()">확인</button>`}</div>`;
+ }
+ if(!game.pending.length)return '';
+ if(timer)return `<p class="tnote">열지 않은 상자 ${game.pending.length}개 · 공부를 끝내면 열 수 있어요</p>`;
+ return `<div class="boxcard"><div class="boxwrap">${BOX_SVG}</div><p class="tsub"><b>열지 않은 상자 ${game.pending.length}개</b></p><button class="btn primary full" onclick="openBox()">상자 열기</button></div>`;
+}
+/* ----- 꾸미기(보관함) ----- */
+function openCloset(){navigate('closet')}
+function toggleItem(id){
+ const it=ITEM_BY_ID[id];if(!it||!game.items.includes(id))return;
+ if(it.slot==='cat')game.equipped.cat=id; // 고양이는 항상 한 마리를 골라 둔다
+ else if(game.equipped[it.slot]===id)delete game.equipped[it.slot];else game.equipped[it.slot]=id;
+ persistGame();renderCloset();
+}
+function renderCloset(){
+ const el=$('closetBody');if(!el)return;
+ if(!user){el.innerHTML='';return}
+ const li=levelInfo(xpTotal());
+ let h=`<div class="card tcard"><div class="tavatar big">${myAvatar(120,'idle')}<span class="glv">Lv.${li.level}</span></div><p class="tsub">모은 보상 ${game.items.length} / ${ITEMS.length}</p></div>`;
+ h+=boxArea();
+ SLOTS.forEach(sl=>{
+  h+=`<div class="card"><h3>${sl.name}</h3><div class="items">`+ITEMS.filter(i=>i.slot===sl.key).map(i=>{
+   if(!game.items.includes(i.id))return `<div class="item lock" role="img" aria-label="아직 얻지 못한 ${i.rarity} 보상"><span class="ipre q">?</span><b>???</b><span class="rar" data-r="${i.rarity}">${i.rarity}</span><small>잠김</small></div>`;
+   const on=game.equipped[sl.key]===i.id,pv={cat:game.equipped.cat};pv[sl.key]=i.id;
+   return `<button class="item${on?' on':''}" onclick="toggleItem('${i.id}')" aria-pressed="${on}"><span class="ipre">${sprHtml(pv,{cell:84})}</span><b>${i.name}</b><span class="rar" data-r="${i.rarity}">${i.rarity}</span><small>${on?(sl.key==='cat'?'함께하는 중':'입는 중'):(sl.key==='cat'?'함께하기':'입히기')}</small></button>`;
+  }).join('')+`</div></div>`;
+ });
+ h+=`<div class="card"><h3>보상은 이렇게 얻어요</h3><p class="sub" style="margin:0">레벨이 오를 때마다 상자를 1개 받고, 열면 아직 없는 보상이 하나 나와요. 새 고양이 2마리와 액세서리 15개가 있고, 희귀도 확률은 일반 ${RARITY[0].w}% · 희귀 ${RARITY[1].w}% · 에픽 ${RARITY[2].w}%예요. 남은 희귀도가 없으면 남은 것끼리 비율을 다시 계산해요. 보상은 모양만 바꾸고 경험치와 계획 계산에는 영향이 없어요.</p></div>`;
+ el.innerHTML=h;
+}
+function addDemoStudy(){ // 시연용: 레벨업과 상자를 바로 보여 주기 위한 공부 기록 추가(실제 경험치에 반영됨)
+ if(!user)return;
+ if(timer){toast('타이머가 실행 중이에요. 먼저 종료해 주세요.');return}
+ if(!confirm('시연용으로 공부 59분을 기록에 추가해요.\n경험치와 레벨에 실제로 반영되니 시연용 계정에서만 쓰세요.'))return;
+ const end=Date.now();
+ addSession({id:crypto.randomUUID?crypto.randomUUID():String(end),taskId:null,start:end-59*60000,end,min:59,demo:true});
+ grantRewards(game);persistGame();refresh();toast('시연용 공부 59분을 추가했어요. 1분만 공부해도 레벨 업!');
+}
 function tickTimer(){
  if(!timer)return;
  const ms=Date.now()-timer.start;
@@ -416,15 +566,15 @@ function syncTick(){ // 타이머가 실행 중일 때만 1초 간격으로 시�
  if(timer&&!tickId)tickId=setInterval(tickTimer,1000);
  else if(!timer&&tickId){clearInterval(tickId);tickId=null}
 }
-const AVATAR='<svg viewBox="0 0 80 80" aria-hidden="true"><circle cx="40" cy="40" r="38" fill="#E6ECFF"/><path d="M16 74c2-14 12-20 24-20s22 6 24 20z" fill="#3452E1"/><rect x="31" y="50" width="18" height="9" rx="4" fill="#FFD9B8"/><circle cx="40" cy="36" r="16" fill="#FFD9B8"/><path d="M23 34c0-12 8-18 17-18s17 6 17 18c-4-6-9-8-17-8s-13 2-17 8z" fill="#2B2F45"/><circle cx="34" cy="38" r="2" fill="#2B2F45"/><circle cx="46" cy="38" r="2" fill="#2B2F45"/><path d="M35 44c3 3 7 3 10 0" fill="none" stroke="#2B2F45" stroke-width="2" stroke-linecap="round"/></svg>';
+function myAvatar(cell,anim){return sprHtml(game.equipped,{cell:cell||96,anim:anim})}
 function xpBar(li){return `<div class="gbar" role="progressbar" aria-valuemin="0" aria-valuemax="${li.need}" aria-valuenow="${li.into}"><i style="width:${Math.round(li.into/li.need*100)}%"></i></div><div class="gxp"><span>다음 레벨까지</span><span>${li.into} / ${li.need} XP</span></div>`}
 function renderGameCard(){
  syncTick();
  const el=$('gameCard');if(!el)return;
  if(!user){el.innerHTML='';return}
  const li=levelInfo(xpTotal()),today=studyMinOn(todayKey());
- el.innerHTML=`<div class="gcard"><div class="ghead"><div class="gch">${AVATAR}<span class="glv">Lv.${li.level}</span></div><div class="grow"><p class="gtitle">나의 공부 캐릭터</p><p class="gsub">${timer?'공부 중':'오늘 공부 '+(today?fmtMin(today):'0분')}</p>${xpBar(li)}</div></div>
- ${timer?`<button class="btn primary full gbtn" onclick="openTimer()"><span data-clock="full">${fmtClock(Date.now()-timer.start)}</span> · 타이머 열기</button>`:`<button class="btn primary full gbtn" onclick="openTimer()">공부 시작</button>`}</div>`;
+ el.innerHTML=`<div class="gcard"><div class="ghead"><div class="gch">${myAvatar(88,'idle')}<span class="glv">Lv.${li.level}</span></div><div class="grow"><p class="gtitle">나의 공부 캐릭터</p><p class="gsub">${timer?'공부 중':'오늘 공부 '+(today?fmtMin(today):'0분')}${!timer&&game.pending.length?` · <button class="boxchip" onclick="openTimer()">상자 ${game.pending.length}개 열기</button>`:''}</p>${xpBar(li)}</div></div>
+ ${timer?`<button class="btn primary full gbtn" onclick="openTimer()"><span data-clock="full">${fmtClock(Date.now()-timer.start)}</span> · 타이머 열기</button>`:`<button class="btn primary full gbtn" onclick="openTimer()">공부 시작</button>`}<button class="btn full gbtn2" onclick="openCloset()">꾸미기 · ${game.items.length}/${ITEMS.length}</button></div>`;
 }
 function renderTimer(){
  syncTick();
@@ -433,18 +583,18 @@ function renderTimer(){
  if(timerResult){ // 종료 결과
   const r=timerResult,li=levelInfo(xpTotal());
   el.innerHTML=r.min===0?`<div class="card tcard"><h2 class="tres">기록하지 못했어요</h2><p class="tsub">1분 미만은 기록되지 않아요.</p><button class="btn primary full" onclick="closeTimerResult()">확인</button></div>`:
-  `<div class="card tcard">${r.up?`<div class="lvup">레벨 업! Lv.${r.level}</div>`:''}<div class="tavatar">${AVATAR}<span class="glv">Lv.${li.level}</span></div><h2 class="tres">+${r.min} XP</h2><p class="tsub">${fmtMin(r.min)} 공부했어요${r.title?' · '+esc(r.title):''}</p>${r.capped?`<p class="tcap">${fmtMin(r.raw)} 동안 켜져 있었지만 한 번에 인정하는 시간은 최대 ${MAX_SESSION_MIN}분이에요.</p>`:''}${xpBar(li)}<button class="btn primary full" style="margin-top:16px" onclick="closeTimerResult()">확인</button></div>`;
+  `<div class="card tcard">${r.up?`<div class="lvup">레벨 업! Lv.${r.level}</div>`:''}<div class="tavatar">${myAvatar(108,r.up?'meow':'idle')}<span class="glv">Lv.${li.level}</span></div><h2 class="tres">+${r.min} XP</h2><p class="tsub">${fmtMin(r.min)} 공부했어요${r.title?' · '+esc(r.title):''}</p>${r.capped?`<p class="tcap">${fmtMin(r.raw)} 동안 켜져 있었지만 한 번에 인정하는 시간은 최대 ${MAX_SESSION_MIN}분이에요.</p>`:''}${xpBar(li)}${boxArea()}<button class="btn primary full" style="margin-top:16px" onclick="closeTimerResult()">확인</button></div>`;
   return;
  }
  if(timer){ // 실행 중
   const tk=tasks.find(x=>x.id===timer.taskId);
-  el.innerHTML=`<div class="card tcard"><p class="tsub">${tk?esc(tk.title):'자유 공부'}</p><div class="tclock" data-clock="full" role="timer" aria-live="off">${fmtClock(Date.now()-timer.start)}</div><p class="tcap" id="timerCap" ${Math.floor((Date.now()-timer.start)/60000)<MAX_SESSION_MIN?'hidden':''}>한 번에 인정하는 시간은 최대 ${MAX_SESSION_MIN}분이에요.</p><p class="tnote">화면을 끄거나 앱을 닫아도 시작한 시각 기준으로 시간이 계산돼요.</p><button class="btn danger full" onclick="stopTimer()">종료하고 기록</button></div>`;
+  el.innerHTML=`<div class="card tcard"><div class="tavatar">${myAvatar(108,'sleep')}</div><p class="tsub">${tk?esc(tk.title):'자유 공부'}</p><div class="tclock" data-clock="full" role="timer" aria-live="off">${fmtClock(Date.now()-timer.start)}</div><p class="tcap" id="timerCap" ${Math.floor((Date.now()-timer.start)/60000)<MAX_SESSION_MIN?'hidden':''}>한 번에 인정하는 시간은 최대 ${MAX_SESSION_MIN}분이에요.</p><p class="tnote">화면을 끄거나 앱을 닫아도 시작한 시각 기준으로 시간이 계산돼요.</p>${boxArea()}<button class="btn danger full" onclick="stopTimer()">종료하고 기록</button></div>`;
   return;
  }
  const plan=buildPlan(),first=((plan.alloc[todayKey()]||[])[0]||{}).id;
  const act=tasks.filter(t=>t.status!=='완료').sort((a,b)=>a.date.localeCompare(b.date));
  const li=levelInfo(xpTotal());
- el.innerHTML=`<div class="card tcard"><div class="tavatar">${AVATAR}<span class="glv">Lv.${li.level}</span></div><div class="field" style="text-align:left"><label for="timerTask">무엇을 공부하나요?</label><select id="timerTask"><option value="">자유 공부 (일정 없음)</option>${act.map(t=>`<option value="${t.id}" ${t.id===first?'selected':''}>${esc(t.title)}</option>`).join('')}</select></div><button class="btn primary full" onclick="startTimer()">시작</button><div class="tstat"><div><span>오늘</span><b>${fmtMin(studyMinOn(todayKey()))}</b></div><div><span>전체</span><b>${fmtMin(totalMin())}</b></div></div><p class="tnote">공부한 1분마다 경험치 1 XP를 얻어요. 한 번에 최대 ${MAX_SESSION_MIN}분까지 인정되고, 1분 미만은 기록되지 않아요.</p></div>`;
+ el.innerHTML=`<div class="card tcard"><div class="tavatar">${myAvatar(108,'idle')}<span class="glv">Lv.${li.level}</span></div><div class="field" style="text-align:left"><label for="timerTask">무엇을 공부하나요?</label><select id="timerTask"><option value="">자유 공부 (일정 없음)</option>${act.map(t=>`<option value="${t.id}" ${t.id===first?'selected':''}>${esc(t.title)}</option>`).join('')}</select></div>${boxArea()}<button class="btn primary full" onclick="startTimer()">시작</button><button class="btn full" style="margin-top:8px" onclick="openCloset()">꾸미기 · ${game.items.length}/${ITEMS.length}</button><div class="tstat"><div><span>오늘</span><b>${fmtMin(studyMinOn(todayKey()))}</b></div><div><span>전체</span><b>${fmtMin(totalMin())}</b></div></div><p class="tnote">공부한 1분마다 경험치 1 XP를 얻어요. 한 번에 최대 ${MAX_SESSION_MIN}분까지 인정되고, 1분 미만은 기록되지 않아요.</p></div>`;
 }
 /* ===== v3.4: 서비스 소개(처음 방문할 때만, 건너뛰기 가능) ===== */
 const INTRO_KEY='aiStudyPlannerIntroSeen';
@@ -556,7 +706,7 @@ var Sync={
   try{
    tasks=Array.isArray(s.tasks)?s.tasks:[];avail=Array.isArray(s.avail)&&s.avail.length===7?s.avail.map(Number):DEFAULT_AVAIL.slice();
    ovr=s.ovr&&typeof s.ovr==='object'&&!Array.isArray(s.ovr)?s.ovr:{};appts=Array.isArray(s.appts)?s.appts:[];commentCache=null;
-   if(s.game&&Array.isArray(s.game.sessions))game={v:1,archivedMin:Number(s.game.archivedMin)||0,bonusXp:Number(s.game.bonusXp)||0,sessions:s.game.sessions}; // 이전 버전 데이터에는 game이 없으므로 그때는 이 기기 기록을 유지
+   if(s.game&&Array.isArray(s.game.sessions)){game=normGame(s.game);grantRewards(game)} // 이전 버전 데이터에는 game이 없으므로 그때는 이 기기 기록을 유지
    Store.set(STORAGE_KEY,tasks);Store.set(AVAIL_KEY,avail);Store.set(OVR_KEY,ovr);Store.set(APPT_KEY,appts);Store.set(GAME_KEY,game);
   }finally{this.applying=false}
   this.setMeta({base:ts,dirty:false});this.setStatus('synced');return true;

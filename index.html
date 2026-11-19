@@ -20,6 +20,11 @@
     <div id="timerBody"></div>
   </section>
 
+  <section class="view" id="view-closet" aria-label="꾸미기">
+    <div class="bar"><button class="iconbtn" onclick="navigate('today')" aria-label="뒤로"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>꾸미기</h2></div>
+    <div id="closetBody"></div>
+  </section>
+
   <!-- 서비스 소개(처음 방문할 때만) -->
   <section class="view" id="view-intro" aria-label="서비스 소개">
     <div class="intro-top"><button class="intro-skip" id="introSkip" onclick="finishIntro()">건너뛰기</button></div>
@@ -67,13 +72,14 @@
     <div class="top"><div><div class="eyebrow">내 정보와 저장된 데이터</div><h1 id="myTitle">마이</h1></div></div>
     <div class="card" id="profileCard"></div>
     <div class="card"><h3>요일별 가용 시간</h3><p class="sub">하루에 학업에 쓸 수 있는 시간(시간 단위)이에요. 계획과 주간 판단에 반영됩니다.</p><div class="avail-grid" id="availGrid"></div></div>
-    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v3.8</span></div></div>
-    <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 지웁니다. 예시 일정에는 “예시” 표시가 붙어요.</p><div class="row2"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div></div>
+    <div class="card"><div class="line"><span>저장된 일정 수</span><b id="settingsCount">0개</b></div><div class="line"><span>버전</span><span>프로토타입 v4.0</span></div></div>
+    <div class="card"><h3>예시 데이터</h3><p class="sub">발표·시연용 예시 일정 5건을 넣거나 지웁니다. 예시 일정에는 “예시” 표시가 붙어요.</p><div class="row2"><button class="btn" onclick="seedSample()">예시 넣기</button><button class="btn" onclick="clearSample()">예시 삭제</button></div><p class="sub" style="margin:12px 0 8px">레벨 업과 상자를 바로 보여 주려면 아래 버튼으로 공부 59분을 기록에 넣어요. 경험치에 실제로 반영되므로 시연용 계정에서만 쓰세요.</p><button class="btn full" onclick="addDemoStudy()">시연용 공부 59분 추가</button></div>
     <div class="card"><h3>데이터 관리</h3><p class="sub" id="resetNote">이 브라우저에 저장된 일정·약속·가용 시간을 초기화합니다.</p><button class="btn danger full" onclick="showResetModal()">데이터 전체 초기화</button></div>
     <div class="card"><h3>약관 및 안내</h3>
       <button class="link-row" onclick="navigate('terms')"><span>이용 약관</span><i>›</i></button>
       <button class="link-row" onclick="navigate('privacy')"><span>개인정보 취급 안내</span><i>›</i></button>
     </div>
+    <p class="credit">고양이 그림: <a href="https://last-tick.itch.io/animated-pixel-kittens-cats-32x32" target="_blank" rel="noopener">Last tick</a> · itch.io</p>
     <div class="notice" id="myNote">로그인은 이 브라우저 안의 로컬 계정이에요. 서버 인증이 아니며 데이터는 현재 브라우저의 localStorage에 저장되고 다른 기기와 동기화되지 않습니다.</div>
   </section>
 
