@@ -333,7 +333,7 @@ function renderDetail(){
  if(!t){$('detailContent').innerHTML='<div class="card empty">일정을 찾을 수 없어요.</div>';return}
  const plan=buildPlan(),pm=prioMap(),p=pm[t.id],d=dday(t);
  $('detailContent').innerHTML=`<div class="card" style="margin-top:14px"><div class="row"><i class="dot" style="background:${typeColor(t.type)}"></i><span class="small muted">${esc(t.type)}${t.sample?' · 예시':''}</span><div class="grow"></div><span class="dday ${d.cls}">${d.label}</span></div><h1 style="margin:8px 0 10px">${esc(t.title)}</h1>
- <div class="dl"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="dl"><span>중요도</span><b>${esc(t.importance)}</b></div><div class="dl"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div>${studyMinOf(t.id)?`<div class="dl"><span>공부한 시간</span><b>${fmtMin(studyMinOf(t.id))}</b></div>`:''}
+ <div class="dl"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="dl"><span>중요도</span><b>${esc(t.importance)}</b></div><div class="dl"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div>${studyMinOf(t.id)?`<div class="dl"><span>공부한 시간</span><b>${fmtMin(studyMinOf(t.id))}</b></div><div class="dl"><span>계획에 남은 시간</span><b>${hh(taskJobs(t).reduce((a,j)=>a+j.h,0))}</b></div>`:''}
  <div class="dl"><label for="stSel">진행 상태</label><select id="stSel" onchange="changeStatus('${t.id}',this.value)"><option ${t.status==='시작 전'?'selected':''}>시작 전</option><option ${t.status==='진행 중'?'selected':''}>진행 중</option><option ${t.status==='완료'?'selected':''}>완료</option></select></div></div>
  ${p?`<div class="card"><div class="row"><b class="grow">우선순위 ${p.rank}위</b><span class="tag rule">규칙</span><span class="num">${p.score}점</span></div><p class="small muted" style="margin:8px 0 0">${esc(reasonOf(t,plan))}</p></div>`:''}
  ${detailExtra(t)}
@@ -417,13 +417,15 @@ function previewAlloc(d){
  return {days,short:pl.taskShort['__draft']||0};
 }
 function renderStepsPanel(){
+ const q=noticeQ,multi=q&&q.items.length>1,pos=multi?`${q.idx+1}/${q.items.length}`:'',last=multi&&q.idx===q.items.length-1;
+ const addLabel=multi?(last?`이 일정 추가하고 마치기 (${pos})`:`이 일정 추가하고 다음으로 (${pos})`):'단계 포함해 추가';
  const d=draft,on=d.steps.filter(x=>x.on),tot=on.reduce((a,x)=>a+x.h,0),pv=on.length?previewAlloc(d):{days:[],short:0};
- setPanel('steps',`<div class="card"><b>${esc(d.title)}</b><div class="small muted">마감 ${fmt(d.date)}</div></div>
+ setPanel('steps',`<div class="card"><b>${esc(d.title)}</b><div class="small muted">마감 ${fmt(d.date)}${multi?` · 공지 속 ${pos}번째 일정`:''}</div></div>
  <div class="row" style="margin:0 0 10px;align-items:flex-start"><span class="tag rule">규칙 기반 단계</span><span class="small muted grow">요구사항을 고정 단계 유형에 연결한 제안이에요. 소요 시간은 추정이니 고쳐 주세요.</span></div>
  <div class="card">${d.steps.map((x,i)=>`<div class="stp2"><label class="cbw"><input type="checkbox" ${x.on?'checked':''} onchange="toggleDraftStep(${i})" aria-label="${esc(x.name)} 포함"></label><div class="grow"><b>${esc(x.name)}</b><small>${x.src==='요구사항'?'요구사항: “'+esc((x.note||'').slice(0,26))+'”':'기본 단계'}</small></div><button class="btn" onclick="adjDraftStep(${i},-.5)" aria-label="${esc(x.name)} 시간 줄이기">−</button><span class="h num">${hh(x.h)}</span><button class="btn" onclick="adjDraftStep(${i},.5)" aria-label="${esc(x.name)} 시간 늘리기">＋</button></div>`).join('')}<div class="total"><span>총 소요 시간</span><span class="num">${hh(tot)}</span></div></div>
  <div class="card"><div class="row" style="margin-bottom:8px"><b class="grow">배정 미리보기</b><span class="tag rule">규칙</span></div>${pv.days.length?pv.days.map(x=>{const dt=dateObj(x.k);return `<div class="pv"><span class="num">${dt.getMonth()+1}/${dt.getDate()}</span><small>${DAY_NAMES[(dt.getDay()+6)%7]}</small><span>${x.items.map(a=>`${esc(a.step)} ${hh(a.h)}`).join(' · ')}</span></div>`}).join(''):'<p class="small muted" style="margin:0">선택한 단계가 없어요.</p>'}${pv.short>0.001?`<p class="small" style="margin:10px 0 0;color:var(--bad);font-weight:700">가용 시간이 모자라 ${hh(pv.short)}는 배정하지 못해요.</p>`:''}<p class="small muted" style="margin:10px 0 0">마감일부터 거꾸로, 내 가용 시간에 맞춰 코드가 계산해요.</p></div>
  <div class="notice">공지에 없는 요구사항은 단계로 만들지 않아요. 자료 조사·작성 같은 기본 단계는 일정 종류별 고정 유형이에요.</div>
- <div class="actions"><button class="btn primary" onclick="confirmAdd(true)" ${tot>0?'':'disabled'}>모두 추가</button><button class="btn" onclick="confirmAdd(false)">단계 없이 마감만 추가</button><button class="btn" onclick="showDraft(draft)">← 추출 결과로</button></div>`);
+ <div class="actions"><button class="btn primary" onclick="confirmAdd(true)" ${tot>0?'':'disabled'}>${addLabel}</button><button class="btn" onclick="confirmAdd(false)">${multi?(last?'단계 없이 추가하고 마치기':'단계 없이 추가하고 다음으로'):'단계 없이 마감만 추가'}</button><button class="btn" onclick="showDraft(draft)">← 추출 결과로</button></div>`);
 }
 function confirmAdd(withSteps){
  const d=draft;if(!d)return;
@@ -781,13 +783,19 @@ function baseAvail(d){return Number(avail[(d.getDay()+6)%7])||0}
 function availOn(d){const k=isoDate(d);if(ovr[k]!==undefined)return Number(ovr[k])||0;return Math.max(0,baseAvail(d)-apptHours(k))}
 // 마감 임박 순으로, 각 일정의 소요 시간을 마감일부터 거꾸로 가용 시간에 채워 넣는다(날짜 계산은 코드가 담당).
 // 배정 단위: 단계가 있으면 남은 단계(마지막 단계부터), 없으면 일정 전체 소요 시간
+// 이 일정에 연결해 공부한 시간은 남은 소요 시간에서 뺀다. 단계가 있으면 이미 끝낸 단계로 설명되는 시간은 빼고, 남은 공부 시간을 앞 단계부터 차례로 채운다(이중 계산 방지).
 function taskJobs(t){
- if(t.steps&&t.steps.length)return t.steps.map((x,i)=>({label:x.name,h:x.h,sid:x.id,ord:i,done:x.done})).filter(x=>!x.done).reverse();
- return [{label:'',h:t.effort/60,sid:'',ord:0}];
+ const sh=studyMinOf(t.id)/60;
+ if(t.steps&&t.steps.length){
+  const doneH=t.steps.filter(x=>x.done).reduce((a,x)=>a+x.h,0);let extra=Math.max(0,sh-doneH);
+  return t.steps.map((x,i)=>({label:x.name,h:x.h,sid:x.id,ord:i,done:x.done})).filter(x=>!x.done).map(x=>{const cut=Math.min(x.h,extra);extra-=cut;return Object.assign(x,{h:x.h-cut})}).filter(x=>x.h>0.001).reverse();
+ }
+ const h=t.effort/60-sh;
+ return h>0.001?[{label:'',h,sid:'',ord:0}]:[];
 }
 function buildPlan(){
  const today=dateObj(isoDate(new Date())),used={},short={},taskShort={},alloc={};
- {const dh=doneToday().reduce((a,x)=>a+x.h,0);if(dh>0)used[isoDate(today)]=Math.min(dh,availOn(today))} // 오늘 이미 끝낸 시간은 오늘 가용 시간에서 먼저 쓴 것으로 계산한다
+ {const dh=Math.max(doneToday().reduce((a,x)=>a+x.h,0),studyMinOn(todayKey())/60);if(dh>0)used[isoDate(today)]=Math.min(dh,availOn(today))} // 오늘 이미 끝낸 시간(완료한 단계, 타이머 공부 중 큰 쪽)은 오늘 가용 시간에서 먼저 쓴 것으로 계산한다
  tasks.filter(t=>t.status!=='완료').sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{
   let dl=dateObj(t.date);if(dl<today)dl=new Date(today);
   taskJobs(t).forEach(job=>{

@@ -379,7 +379,7 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
  * 굵은 테두리, 계단식 그림자, 각진 모서리. 상태 색(여유·빠듯·부족·일정 없음)과 AI 보라색은 의미가 있어 바꾸지 않는다.
  * 색 변수만 바꿔도 전체 분위기가 바뀌도록 아래 변수에 모았다. */
 :root{--ink:#221E1B;--bg:#EFE7DA;--surface:#FFFBF3;--muted:#5C534A;--line:#221E1B;--accent:#8A5A12;--fill:#D9902F;--accent-soft:#F8E4BF;--on-accent:#221E1B;--head:#3A3430;--on-head:#FFF4DC;--head-em:#F5C562;--av:#E9DEC8;--track:#E3D6BC;--pixel:4px 4px 0 var(--ink)}
-body{background:var(--ink)}
+body{background:#fff}
 .app-shell{box-shadow:none}
 :focus-visible{outline:3px solid var(--fill);outline-offset:2px}
 .card,.gcard,.tcard{border:2px solid var(--ink);border-radius:10px;box-shadow:var(--pixel);background:var(--surface)}
@@ -425,3 +425,7 @@ input,select,textarea{border-width:2px!important;border-color:var(--ink)!importa
 
 /* ===== v4.2: 휴대폰 확인 후 보정 ===== */
 .glv{right:-12px;bottom:-10px} /* Lv 배지가 고양이 꼬리를 가리지 않게 아바타 모서리 밖으로 */
+
+/* v4.3 접근성: 녹색 글자 대비 4.45→6.3, 도움말 버튼 터치 영역 44px */
+.tag.good,.dday.rd{color:#166534}
+.help-btn{width:44px;height:44px}
