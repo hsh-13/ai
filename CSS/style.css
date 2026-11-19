@@ -422,3 +422,6 @@ input,select,textarea{border-width:2px!important;border-color:var(--ink)!importa
 .day.sel{background:var(--fill);border-color:var(--ink);color:var(--on-accent)}
 .day{border:2px solid var(--ink);border-radius:10px}
 .intro-body{box-shadow:var(--pixel)}
+
+/* ===== v4.2: 휴대폰 확인 후 보정 ===== */
+.glv{right:-12px;bottom:-10px} /* Lv 배지가 고양이 꼬리를 가리지 않게 아바타 모서리 밖으로 */
