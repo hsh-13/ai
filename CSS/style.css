@@ -374,3 +374,51 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
 .spr{position:absolute;left:50%;top:50%;width:var(--cell);height:var(--cell);transform:translate(-50%,-50%);pointer-events:none}
 .spr i{position:absolute;inset:0;background-repeat:no-repeat;image-rendering:pixelated;background-size:calc(var(--cell)*11) calc(var(--cell)*53);background-position:calc(var(--fx)*var(--cell)*-1) calc(var(--fy)*var(--cell)*-1)}
 .credit{font-size:12px;color:var(--muted);text-align:center;margin:16px 0 4px}.credit a{color:inherit}
+
+/* ===== v4.1: 고양이 테마 — 레트로 픽셀 + 차콜·크림·호박색 =====
+ * 굵은 테두리, 계단식 그림자, 각진 모서리. 상태 색(여유·빠듯·부족·일정 없음)과 AI 보라색은 의미가 있어 바꾸지 않는다.
+ * 색 변수만 바꿔도 전체 분위기가 바뀌도록 아래 변수에 모았다. */
+:root{--ink:#221E1B;--bg:#EFE7DA;--surface:#FFFBF3;--muted:#5C534A;--line:#221E1B;--accent:#8A5A12;--fill:#D9902F;--accent-soft:#F8E4BF;--on-accent:#221E1B;--head:#3A3430;--on-head:#FFF4DC;--head-em:#F5C562;--av:#E9DEC8;--track:#E3D6BC;--pixel:4px 4px 0 var(--ink)}
+body{background:var(--ink)}
+.app-shell{box-shadow:none}
+:focus-visible{outline:3px solid var(--fill);outline-offset:2px}
+.card,.gcard,.tcard{border:2px solid var(--ink);border-radius:10px;box-shadow:var(--pixel);background:var(--surface)}
+.btn{border:2px solid var(--ink);border-radius:10px;box-shadow:0 3px 0 var(--ink)}
+.btn.primary{background:var(--fill);border-color:var(--ink);box-shadow:0 3px 0 var(--ink);color:var(--on-accent)}
+.btn:active{transform:translateY(2px);box-shadow:0 1px 0 var(--ink)}
+.view>.top{background:var(--head) radial-gradient(rgba(255,255,255,.08) 2px,transparent 2px) 0 0/16px 16px;border-radius:0;border-bottom:3px solid var(--ink);color:var(--on-head)}
+.view>.top::after{display:none}
+.view>.top h1,.view>.top .eyebrow,.view>.top .iconbtn,.view>.top .link{color:var(--on-head)}
+.view>.top h1 em{color:var(--head-em)}
+.auth-hero,.intro-hero{background:var(--head) radial-gradient(rgba(255,255,255,.08) 2px,transparent 2px) 0 0/16px 16px;border-radius:0;border-bottom:3px solid var(--ink);color:var(--on-head)}
+.gch,.tavatar,.rvav,.ipre{border-radius:10px;border:2px solid var(--ink);background:var(--av)}
+.ipre.q{border-radius:10px;background:var(--track);color:var(--muted)}
+.glv{border:2px solid var(--ink);border-radius:6px;background:var(--fill);color:var(--on-accent)}
+.gbar{background:var(--track);border:2px solid var(--ink);border-radius:4px;height:12px}
+.gbar i{border-radius:0;background:var(--fill)}
+.nav{background:var(--surface);border-top:3px solid var(--ink)}
+.nav button.active,.nav .nav-add{color:var(--accent)}
+.nav .nav-add i{border-radius:10px;border:2px solid var(--ink);background:var(--fill);box-shadow:0 3px 0 var(--ink)}
+.nav .nav-add i svg{stroke:var(--on-accent)}
+.bar{background:var(--surface);border-bottom:3px solid var(--ink)}
+.chip{border:2px solid var(--ink);border-radius:10px}
+.chip.on{background:var(--fill);color:var(--on-accent);border-color:var(--ink)}
+.tag{border-radius:4px}
+.lb-b{background:var(--track);border-radius:4px;border:2px solid var(--ink)}
+.lb-f{border-radius:2px}
+.lb-c.today .lb-d{background:var(--fill);color:var(--on-accent)}
+input,select,textarea{border-width:2px!important;border-color:var(--ink)!important;border-radius:8px!important}
+.auth-hero::after,.intro-hero::after{display:none}
+.notice{background:var(--accent-soft);color:#4A3410;border:2px solid var(--ink);border-radius:10px}
+.notice.warn{background:#FBE9C6;color:#4A3410}
+.seg{background:var(--track);border:2px solid var(--ink);border-radius:10px}
+.seg button.active{background:var(--surface);color:var(--ink);border:2px solid var(--ink);box-shadow:none;border-radius:8px}
+.st b{background:var(--track);border:2px solid var(--ink)}
+.st.on b{background:var(--fill);color:var(--on-accent)}
+.stline{background:var(--ink)}
+.progress i,.sheet-item.main i,.intro-dots i.on{background:var(--fill)}
+.chk.on i{background:var(--fill);border-color:var(--ink)}
+.chk.on i svg{stroke:var(--on-accent)}
+.day.sel{background:var(--fill);border-color:var(--ink);color:var(--on-accent)}
+.day{border:2px solid var(--ink);border-radius:10px}
+.intro-body{box-shadow:var(--pixel)}
