@@ -11,6 +11,9 @@
  * 보안 한계: 비밀번호는 HTTPS로 이 서버에 전달되어 솔트+반복 SHA-256 해시로 저장된다. 시트 소유자(팀원)는 해시와 일정 데이터를 볼 수 있다.
  */
 var MODEL = 'gemini-3.5-flash-lite';
+// 기본 모델이 과부하일 때 차례로 시도할 대체 모델. 이름이 틀리거나 없는 모델(404)은 건너뛰므로 안전하다.
+// 실제로 쓸 수 있는 이름은 구글 AI Studio의 모델 목록에서 확인해 바꿔 둔다.
+var MODELS = [MODEL, 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'];
 var MAX_TEXT = 2000;      // 입력 길이 제한(프론트와 동일)
 var MAX_ITEMS = 5;       // 공지 하나에서 받는 일정 수 상한(화면에서 하나씩 확인하므로 작게 둔다)
 var DAILY_LIMIT = 200;    // 하루 전체 요청 한도(남용·비용 방지용 임의 값)
@@ -73,15 +76,27 @@ function comment_(req) {
 
 function callGemini_(prompt) {
   var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
-  var res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODEL + ':generateContent', {
-    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
-    headers: { 'x-goog-api-key': key },
-    payload: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
-    })
-  });
-  if (res.getResponseCode() !== 200) return { error: 'upstream_' + res.getResponseCode() };
+  var res, code, done = false;
+  // 모델마다 수용량이 따로라서, 기본 모델이 계속 503(과부하)·429(한도)·500이면 다음 모델로 넘어간다.
+  // 모델 이름이 없으면(404) 바로 다음 모델로 넘어간다. 400·401·403은 모델 문제가 아니므로 바로 오류로 돌려준다.
+  for (var m = 0; m < MODELS.length && !done; m++) {
+    for (var attempt = 0; attempt < 2; attempt++) {
+      res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[m] + ':generateContent', {
+        method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+        headers: { 'x-goog-api-key': key },
+        payload: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', temperature: 0.1 }
+        })
+      });
+      code = res.getResponseCode();
+      if (code === 200) { done = true; break; }
+      if (code === 404) break;                                       // 다음 모델
+      if (code !== 429 && code !== 500 && code !== 503) { done = true; break; } // 재시도해도 소용없는 오류
+      if (attempt === 0) Utilities.sleep(1200);
+    }
+  }
+  if (code !== 200) return { error: 'upstream_' + code, detail: String(res.getContentText()).slice(0, 120) };
   var body = JSON.parse(res.getContentText());
   var t = body.candidates && body.candidates[0] && body.candidates[0].content.parts[0].text;
   return JSON.parse(t); // 형식 검증은 프론트(validExtract3)가 한다
