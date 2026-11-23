@@ -333,7 +333,7 @@ function renderDetail(){
  if(!t){$('detailContent').innerHTML='<div class="card empty">일정을 찾을 수 없어요.</div>';return}
  const plan=buildPlan(),pm=prioMap(),p=pm[t.id],d=dday(t);
  $('detailContent').innerHTML=`<div class="card" style="margin-top:14px"><div class="row"><i class="dot" style="background:${typeColor(t.type)}"></i><span class="small muted">${esc(t.type)}${t.sample?' · 예시':''}</span><div class="grow"></div><span class="dday ${d.cls}">${d.label}</span></div><h1 style="margin:8px 0 10px">${esc(t.title)}</h1>
- <div class="dl"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="dl"><span>중요도</span><b>${esc(t.importance)}</b></div><div class="dl"><span>예상 소요 시간</span><b>${effortLabel(t.effort)}</b></div>${studyMinOf(t.id)?`<div class="dl"><span>공부한 시간</span><b>${fmtMin(studyMinOf(t.id))}</b></div><div class="dl"><span>계획에 남은 시간</span><b>${hh(taskJobs(t).reduce((a,j)=>a+j.h,0))}</b></div>`:''}
+ <div class="dl"><span>마감 날짜</span><b>${fmt(t.date)}</b></div><div class="dl"><span>중요도</span><b>${esc(t.importance)}</b></div><div class="dl"><span>예상 소요 시간</span><b>${t.steps&&t.steps.length?fh(t.steps.reduce((a,x)=>a+x.h,0))+' (단계 합계)':effortLabel(t.effort)}</b></div>${studyMinOf(t.id)?`<div class="dl"><span>공부한 시간</span><b>${fmtMin(studyMinOf(t.id))}</b></div><div class="dl"><span>계획에 남은 시간</span><b>${hh(taskJobs(t).reduce((a,j)=>a+j.h,0))}</b></div>`:''}
  <div class="dl"><label for="stSel">진행 상태</label><select id="stSel" onchange="changeStatus('${t.id}',this.value)"><option ${t.status==='시작 전'?'selected':''}>시작 전</option><option ${t.status==='진행 중'?'selected':''}>진행 중</option><option ${t.status==='완료'?'selected':''}>완료</option></select></div></div>
  ${p?`<div class="card"><div class="row"><b class="grow">우선순위 ${p.rank}위</b><span class="tag rule">규칙</span><span class="num">${p.score}점</span></div><p class="small muted" style="margin:8px 0 0">${esc(reasonOf(t,plan))}</p></div>`:''}
  ${detailExtra(t)}
@@ -607,8 +607,9 @@ function finishIntro(){try{localStorage.setItem(INTRO_KEY,'1')}catch(e){}navigat
 function introNext(d){introIdx=Math.max(0,Math.min(INTRO_SLIDES().length-1,introIdx+d));renderIntro()}
 function INTRO_SLIDES(){return [
  {t:'먼저 가용 시간을 정해요',p:'마이 탭에서 요일마다 입력해요'},
- {t:'일정은 + 버튼으로 넣어요',p:'세 가지 중 편한 방법으로 추가해요'},
+ {t:'일정은 + 버튼으로 넣어요',p:'세 가지 중 편한 방법으로 추가해요',n:'AI가 공지에서 일정을 여러 개 찾으면 하나씩 확인하고 추가해요'},
  {t:'오늘 할 일과 계획을 봐요',p:'여유·빠듯·부족으로 바로 알려 줘요'},
+ {t:'공부는 타이머로 기록해요',p:'일정을 골라 공부하면 그만큼 남은 시간이 줄어요',n:'일정 없이 하는 자유 공부는 일정의 남은 시간을 줄이지 않아요. 한 번에 최대 120분까지 인정하고, 공부한 분만큼 XP가 쌓여요'},
  {t:'“규칙” 표시는 이런 뜻이에요',p:'규칙은 코드가 계산한 값, AI는 AI가 쓴 글이에요',n:AI_ENDPOINT?'':'지금은 AI 미연결이라 규칙으로 처리해요'}
 ]}
 function INTRO_ART(i){
@@ -637,6 +638,12 @@ function INTRO_ART(i){
   [48,74].forEach((y,k)=>{g+=`<rect x="226" y="${y-9}" width="18" height="18" rx="6" fill="var(--accent-soft)"/>`+T(235,y+4,11,k+1,800,'var(--accent)','middle')+`<rect x="250" y="${y-3}" width="${k?30:40}" height="6" rx="3" fill="var(--line)"/>`});
   g+=T(262,100,11,'우선순위',700,'var(--muted)','middle');
   g+=T(58,126,12,'체크',700,'var(--muted)','middle')+T(160,126,12,'날짜별 확인',700,'var(--muted)','middle')+T(262,126,12,'전체 목록',700,'var(--muted)','middle');
+ }else if(i===3){ // 공부 타이머 → 남은 시간 감소
+  g+=box(10,10,146,110,16)+T(83,32,12,'공부할 일정',700,'var(--muted)','middle')+box(24,40,118,26,9,'var(--bg)')+T(83,58,13,'보고서 작성',700,'var(--ink)','middle')+T(83,102,28,'25:00',800,'var(--accent)','middle');
+  g+='<path d="M159 65h10m-4-4l4 4-4 4" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  g+=box(172,10,138,110,16)+T(186,34,12,'남은 소요 시간',700,'var(--muted)');
+  g+=T(186,56,12,'공부 전 3시간',700,'var(--ink)')+'<rect x="186" y="62" width="110" height="9" rx="4.5" fill="var(--accent)" opacity=".35"/>';
+  g+=T(186,92,12,'공부 후 2시간 35분',700,'var(--accent)')+'<rect x="186" y="98" width="110" height="9" rx="4.5" fill="var(--accent-soft)"/><rect x="186" y="98" width="'+Math.round(110*155/180)+'" height="9" rx="4.5" fill="var(--accent)"/>';
  }else{ // 규칙 vs AI
   g+=box(10,10,146,110,16)+box(164,10,146,110,16);
   g+='<rect x="22" y="22" width="48" height="24" rx="12" fill="#fff" stroke="var(--line)" stroke-width="1.5"/>'+T(46,39,13,'규칙',800,'var(--muted)','middle');
@@ -839,27 +846,57 @@ async function aiCall(task,payload,signal){
 const TYPES=['과제','시험','발표','팀 프로젝트'],IMPS=['높음','보통','낮음'],EFFORTS=[30,60,120,180,300];
 function nearestEffort(m){return EFFORTS.reduce((a,b)=>Math.abs(b-m)<Math.abs(a-m)?b:a)}
 function validExtract(o){return o&&typeof o.title==='string'&&o.title.trim()&&TYPES.includes(o.type)&&/^\d{4}-\d{2}-\d{2}$/.test(o.date||'')&&IMPS.includes(o.importance)&&EFFORTS.includes(Number(o.effort))}
+function okMD(m,d){return m>=1&&m<=12&&d>=1&&d<=31}
+// "12/5"처럼 월/일로 읽을 수 있는 표기만 돌려준다. "1/3 반영"·"배점 3/4" 같은 비율, "2026/12/05"·"10/20/30" 같은 긴 숫자열의 일부는 날짜로 읽지 않는다.
+function slashDates(text){
+ const out=[],re=/(\d{1,2})\/(\d{1,2})/g;let m;
+ while(m=re.exec(text)){
+  const i=m.index,e=i+m[0].length,pre=text.charAt(i-1),nx=text.charAt(e);
+  if(/[\d\/.]/.test(pre)||/[\d\/]/.test(nx))continue;
+  if(!okMD(+m[1],+m[2]))continue;
+  if(/(배점|비중|비율|점수|분량|전체|총|약)\s*$/.test(text.slice(Math.max(0,i-4),i))||/^\s*(반영|이상|이하|정도|씩|배|만큼)/.test(text.slice(e,e+4)))continue;
+  out.push({str:m[0],m:+m[1],d:+m[2]});
+ }
+ return out;
+}
+// 연도 포함 → "월 일" → 슬래시 순서로 첫 번째 유효한 날짜 표기를 찾는다. 달·일 범위가 맞지 않는 숫자(1234-56-78 등)는 건너뛴다.
+function allDates(text){
+ const out=[];let m;
+ const reY=/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/g;while(m=reY.exec(text)){if(okMD(+m[2],+m[3]))out.push({str:m[0],y:+m[1],m:+m[2],d:+m[3],k:0})}
+ const reK=/(\d{1,2})\s*월\s*(\d{1,2})\s*일/g;while(m=reK.exec(text)){if(okMD(+m[1],+m[2]))out.push({str:m[0],y:null,m:+m[1],d:+m[2],k:1})}
+ slashDates(text).forEach(x=>out.push({str:x.str,y:null,m:x.m,d:x.d,k:2}));
+ return out;
+}
+function firstDate(text){const a=allDates(text);for(const k of [0,1,2]){const f=a.find(x=>x.k===k);if(f)return f}return null}
 function parseDate(text){
- const now=new Date(),today=dateObj(isoDate(now));let m,d=null;
- if(m=text.match(/(\d{4})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/))d=new Date(+m[1],+m[2]-1,+m[3],12);
- else if(m=text.match(/(\d{1,2})\s*월\s*(\d{1,2})\s*일/))d=new Date(now.getFullYear(),+m[1]-1,+m[2],12);
- else if(m=text.match(/(\d{1,2})\/(\d{1,2})/))d=new Date(now.getFullYear(),+m[1]-1,+m[2],12);
+ const now=new Date(),today=dateObj(isoDate(now));let m,d=null;const f=firstDate(text);
+ if(f)d=new Date(f.y!=null?f.y:now.getFullYear(),f.m-1,f.d,12);
  else if(/모레/.test(text)){d=new Date(today);d.setDate(d.getDate()+2)}
  else if(/내일/.test(text)){d=new Date(today);d.setDate(d.getDate()+1)}
  else if(/오늘/.test(text))d=new Date(today);
  else if(m=text.match(/(이번|다음)\s*주\s*([월화수목금토일])요일/)){const idx='월화수목금토일'.indexOf(m[2]);d=new Date(startOfWeek(today));d.setDate(d.getDate()+idx+(m[1]==='다음'?7:0))}
- if(d&&d<today&&!/(\d{4})/.test(text)&&!/이번|다음/.test(text))d.setFullYear(d.getFullYear()+1);
+ if(d&&f&&f.y==null&&d<today&&!/이번|다음/.test(text))d.setFullYear(d.getFullYear()+1);
  return d?isoDate(d):'';
+}
+// 일정 종류 판정(규칙 기반): 공지 첫 줄(제목)에 종류 단어가 있으면 그것을 우선한다. 없으면 본문 전체에서 찾는다.
+// 본문 한 줄에 "발표 슬라이드는 따로 준비"처럼 다른 종류의 단어가 섞여 있어도 제목이 "과제"면 과제로 본다.
+const TYPE_RULES=[['팀 프로젝트',/팀\s*프로젝트|팀플/],['시험',/시험|중간고사|기말|퀴즈/],['발표',/발표|\bP{1,2}T\b|프레젠/],['과제',/과제|레포트|리포트|보고서/]];
+function guessType(text){
+ const first=text.split(/\n/).map(x=>x.trim()).find(Boolean)||'';
+ let best=null,at=1e9; // 제목 줄에서는 우선순위보다 "먼저 나오는" 종류 단어를 따른다(동률이면 우선순위 순)
+ TYPE_RULES.forEach(x=>{const m=first.match(x[1]);if(m&&m.index<at){at=m.index;best=x[0]}});
+ if(best)return best;
+ const r=TYPE_RULES.find(x=>x[1].test(text)); // 제목에 없으면 본문 전체에서 우선순위 순으로 찾는다
+ return r?r[0]:'과제';
 }
 function mockExtract(text){
  const line=(text.split(/\n/).map(x=>x.trim()).find(Boolean)||'').replace(/^[\[\(【](.*?)[\]\)】]\s*/,'$1 ');
- const type=/팀\s*프로젝트|팀플/.test(text)?'팀 프로젝트':/시험|중간고사|기말|퀴즈/.test(text)?'시험':/발표|PT|프레젠/i.test(text)?'발표':'과제';
+ const type=guessType(text);
  const h=text.match(/(\d+(?:\.\d+)?)\s*시간/),effort=h?nearestEffort(parseFloat(h[1])*60):{시험:180,발표:120,'팀 프로젝트':300,과제:120}[type];
  const importance=/중간고사|기말|필수|성적/.test(text)?'높음':'보통';
  return {title:line.slice(0,40),type,date:parseDate(text),importance,effort};
 }
 /* ===== v3.0: 공지 추출 — 근거 문장·상대 날짜 코드 계산·확인 필요·실패 대체·단계 제안 ===== */
-const DATE_RE=/\d{4}[.\-\/]\s*\d{1,2}[.\-\/]\s*\d{1,2}|\d{1,2}\s*월\s*\d{1,2}\s*일|\d{1,2}\/\d{1,2}/;
 function updateNoticeCount(){const el=$('noticeCount');if(el)el.textContent=$('noticeInput').value.length.toLocaleString('ko-KR')}
 function normTxt(s){return String(s).replace(/\s+/g,'')}
 function inText(ev,text){return !!ev&&normTxt(text).includes(normTxt(ev))} // 근거 문장이 원문에 실제로 있는지 코드가 확인한다
@@ -879,8 +916,8 @@ function validExtract3(o){
  return o.requirements.every(r=>r&&typeof r.text==='string'&&r.text.trim()&&r.text.length<=80&&typeof r.evidence==='string');
 }
 function mockDeadline(text){
- const mm=text.match(DATE_RE),ds=parseDate(text);let m;
- if(mm&&ds)return {kind:'absolute',date:ds,evidence:mm[0]};
+ const f0=firstDate(text),ds=parseDate(text);let m;
+ if(f0&&ds)return {kind:'absolute',date:ds,evidence:f0.str};
  if(m=text.match(/(이번|다음)\s*주\s*([월화수목금토일])요일/))return {kind:'relative_week',weekOffset:m[1]==='다음'?1:0,weekday:'월화수목금토일'.indexOf(m[2]),evidence:m[0]};
  if(/모레/.test(text))return {kind:'relative_days',days:2,evidence:'모레'};
  if(/내일/.test(text))return {kind:'relative_days',days:1,evidence:'내일'};
@@ -906,7 +943,7 @@ function buildDraft(o,text,mode){
   if(dd.rel)flags.push(`상대 날짜(“${ev||'-'}”)를 기준일 ${fmt(today)}로 계산했습니다. 맞는지 확인해 주세요.`);
   if(dd.date<today)flags.push('이미 지난 날짜입니다.');
  }
- const dates=new Set((text.match(new RegExp(DATE_RE.source,'g'))||[]).map(normTxt));
+ const dates=new Set(allDates(text).map(x=>normTxt(x.str)));
  if(dates.size>1&&!(noticeQ&&noticeQ.items.length>1))flags.push('공지에 날짜가 여러 개 있습니다. 마감이 맞는지 확인해 주세요.');
  const reqs=o.requirements.map(r=>({text:r.text.trim(),evidence:r.evidence,ok:inText(r.evidence,text)}));
  if(reqs.some(r=>!r.ok))flags.push('원문에서 근거를 찾지 못한 요구사항이 있습니다.');
