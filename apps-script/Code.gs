@@ -1,5 +1,5 @@
 /**
- * AI 학업 플래너 v3.3 — Apps Script 서버 (초안: 모의 환경 테스트만 마침, 실제 배포·호출 테스트 전)
+ * AI 학업 플래너 — Apps Script 서버 (v4.3 기준. 가입·로그인·저장은 배포·연동 확인됨, AI는 재시도·모델 전환 포함)
  * 하는 일: ① 공지 추출·코멘트용 AI 중계(Gemini)  ② 닉네임 계정 + 일정 데이터를 구글 시트에 저장
  *
  * 배포 방법은 같은 폴더의 SETUP.md를 따른다. 요약:
@@ -77,10 +77,12 @@ function comment_(req) {
 function callGemini_(prompt) {
   var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   var res, code, done = false;
+  var t0 = Date.now();   // 앱은 25초에 포기하므로, 서버는 20초가 지나면 더 시도하지 않고 마지막 오류를 돌려준다
   // 모델마다 수용량이 따로라서, 기본 모델이 계속 503(과부하)·429(한도)·500이면 다음 모델로 넘어간다.
   // 모델 이름이 없으면(404) 바로 다음 모델로 넘어간다. 400·401·403은 모델 문제가 아니므로 바로 오류로 돌려준다.
   for (var m = 0; m < MODELS.length && !done; m++) {
     for (var attempt = 0; attempt < 2; attempt++) {
+      if (Date.now() - t0 > 20000) { done = true; break; }
       res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[m] + ':generateContent', {
         method: 'post', contentType: 'application/json', muteHttpExceptions: true,
         headers: { 'x-goog-api-key': key },
@@ -102,13 +104,24 @@ function callGemini_(prompt) {
   return JSON.parse(t); // 형식 검증은 프론트(validExtract3)가 한다
 }
 
-function allow_() {
-  var c = CacheService.getScriptCache(), k = 'n_' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
-  var n = Number(c.get(k) || 0);
-  if (n >= DAILY_LIMIT) return false;
-  c.put(k, String(n + 1), 86400);
-  return true;
+// 날짜별 카운터. CacheService는 최대 6시간만 값을 들고 있어서 하루 한도에 쓸 수 없으므로 스크립트 속성에 저장한다.
+// 하루가 바뀌면(한국 시간) 0부터 다시 센다. 값이 깨져 있어도 0부터 다시 센다.
+function bump_(name, limit) {
+  var p = PropertiesService.getScriptProperties();
+  var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(3000)) return false;   // 잠금을 못 얻으면 거절(안전한 쪽)
+  try {
+    var o = { d: today, n: 0 };
+    try { var raw = p.getProperty(name); if (raw) o = JSON.parse(raw); } catch (e) {}
+    if (o.d !== today) o = { d: today, n: 0 };
+    if (o.n >= limit) return false;
+    o.n++;
+    p.setProperty(name, JSON.stringify(o));
+    return true;
+  } finally { lock.releaseLock(); }
 }
+function allow_() { return bump_('cnt_ai', DAILY_LIMIT); }
 
 /* ===== 계정 + 일정 데이터 저장 (구글 시트 "users" 탭) =====
  * 열: nick | salt | hash | token | tokenExp | data | updatedAt | createdAt
@@ -231,12 +244,6 @@ function hash_(salt, pw) {
 }
 function uuid_() { return Utilities.getUuid().replace(/-/g, ''); }
 function newToken_() { return uuid_() + uuid_(); }
-function accAllow_() {
-  var c = CacheService.getScriptCache(), k = 'a_' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyyMMdd');
-  var n = Number(c.get(k) || 0);
-  if (n >= ACCOUNT_DAILY_LIMIT) return false;
-  c.put(k, String(n + 1), 86400);
-  return true;
-}
+function accAllow_() { return bump_('cnt_acc', ACCOUNT_DAILY_LIMIT); }
 
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
