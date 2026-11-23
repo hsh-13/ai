@@ -13,7 +13,7 @@
 var MODEL = 'gemini-3.5-flash-lite';
 // 기본 모델이 과부하일 때 차례로 시도할 대체 모델. 이름이 틀리거나 없는 모델(404)은 건너뛰므로 안전하다.
 // 실제로 쓸 수 있는 이름은 구글 AI Studio의 모델 목록에서 확인해 바꿔 둔다.
-var MODELS = [MODEL, 'gemini-3.1-flash-lite', 'gemini-2.5-flash-lite'];
+var MODELS = [MODEL, 'gemini-3.1-flash-lite'];
 var MAX_TEXT = 2000;      // 입력 길이 제한(프론트와 동일)
 var MAX_ITEMS = 5;       // 공지 하나에서 받는 일정 수 상한(화면에서 하나씩 확인하므로 작게 둔다)
 var DAILY_LIMIT = 200;    // 하루 전체 요청 한도(남용·비용 방지용 임의 값)
@@ -74,16 +74,17 @@ function comment_(req) {
   return callGemini_(prompt);
 }
 
-function callGemini_(prompt) {
+function callGemini_(prompt, modelOverride) {
   var key = PropertiesService.getScriptProperties().getProperty('GEMINI_API_KEY');
   var res, code, done = false;
+  var models = modelOverride || MODELS;
   var t0 = Date.now();   // 앱은 25초에 포기하므로, 서버는 20초가 지나면 더 시도하지 않고 마지막 오류를 돌려준다
   // 모델마다 수용량이 따로라서, 기본 모델이 계속 503(과부하)·429(한도)·500이면 다음 모델로 넘어간다.
   // 모델 이름이 없으면(404) 바로 다음 모델로 넘어간다. 400·401·403은 모델 문제가 아니므로 바로 오류로 돌려준다.
-  for (var m = 0; m < MODELS.length && !done; m++) {
+  for (var m = 0; m < models.length && !done; m++) {
     for (var attempt = 0; attempt < 2; attempt++) {
       if (Date.now() - t0 > 20000) { done = true; break; }
-      res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + MODELS[m] + ':generateContent', {
+      res = UrlFetchApp.fetch('https://generativelanguage.googleapis.com/v1beta/models/' + models[m] + ':generateContent', {
         method: 'post', contentType: 'application/json', muteHttpExceptions: true,
         headers: { 'x-goog-api-key': key },
         payload: JSON.stringify({
@@ -247,3 +248,134 @@ function newToken_() { return uuid_() + uuid_(); }
 function accAllow_() { return bump_('cnt_acc', ACCOUNT_DAILY_LIMIT); }
 
 function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+
+
+
+
+
+
+// Gemini 모델별 API 호출 가능 여부 확인용 테스트
+function testGeminiModelsOnce() {
+  var key = PropertiesService.getScriptProperties()
+    .getProperty('GEMINI_API_KEY');
+
+  if (!key) {
+    Logger.log('오류: GEMINI_API_KEY가 설정되어 있지 않습니다.');
+    return;
+  }
+
+  var models = [
+    'gemini-3.5-flash-lite',
+    'gemini-3.1-flash-lite',
+    'gemini-2.5-flash-lite'
+  ];
+
+  for (var i = 0; i < models.length; i++) {
+    var model = models[i];
+
+    try {
+      var res = UrlFetchApp.fetch(
+        'https://generativelanguage.googleapis.com/v1beta/models/' +
+        model + ':generateContent',
+        {
+          method: 'post',
+          contentType: 'application/json',
+          muteHttpExceptions: true,
+          headers: {
+            'x-goog-api-key': key
+          },
+          payload: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: 'Return exactly this JSON: {"ok":true}'
+              }]
+            }],
+            generationConfig: {
+              responseMimeType: 'application/json',
+              temperature: 0
+            }
+          })
+        }
+      );
+
+      Logger.log(
+        model + ' : HTTP ' + res.getResponseCode()
+      );
+
+      Logger.log(
+        String(res.getContentText()).slice(0, 250)
+      );
+
+    } catch (e) {
+      Logger.log(model + ' : 호출 예외 - ' + e.message);
+    }
+  }
+}
+
+
+
+
+function testFallbackTo31() {
+  var key = PropertiesService.getScriptProperties()
+    .getProperty('GEMINI_API_KEY');
+
+  // 테스트용: 존재하지 않는 모델을 먼저 호출한 뒤 3.1 호출
+  var testModels = [
+    'gemini-test-invalid-model',
+    'gemini-3.1-flash-lite'
+  ];
+
+  for (var i = 0; i < testModels.length; i++) {
+    var model = testModels[i];
+
+    var res = UrlFetchApp.fetch(
+      'https://generativelanguage.googleapis.com/v1beta/models/' +
+      model + ':generateContent',
+      {
+        method: 'post',
+        contentType: 'application/json',
+        muteHttpExceptions: true,
+        headers: { 'x-goog-api-key': key },
+        payload: JSON.stringify({
+          contents: [{
+            parts: [{ text: 'Return exactly: {"ok":true}' }]
+          }],
+          generationConfig: {
+            responseMimeType: 'application/json',
+            temperature: 0
+          }
+        })
+      }
+    );
+
+    var code = res.getResponseCode();
+    Logger.log(model + ' : HTTP ' + code);
+
+    if (code === 200) {
+      Logger.log('최종 성공 모델: ' + model);
+      Logger.log(res.getContentText().slice(0, 250));
+      return;
+    }
+
+    if (code === 404 || code === 429 ||
+        code === 500 || code === 503) {
+      Logger.log('다음 모델로 이동합니다.');
+      continue;
+    }
+
+    Logger.log('다른 오류로 테스트 중단: ' + code);
+    return;
+  }
+
+  Logger.log('모든 테스트 모델 호출 실패');
+}
+
+
+function testCallGeminiFallback() {
+  var result = callGemini_(
+    '반드시 JSON 형식으로 {"ok": true} 만 반환해 줘.',
+    ['gemini-test-invalid-model', 'gemini-3.1-flash-lite']
+  );
+
+  Logger.log('최종 테스트 결과: ' + JSON.stringify(result));
+}
