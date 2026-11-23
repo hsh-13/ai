@@ -429,3 +429,8 @@ input,select,textarea{border-width:2px!important;border-color:var(--ink)!importa
 /* v4.3 접근성: 녹색 글자 대비 4.45→6.3, 도움말 버튼 터치 영역 44px */
 .tag.good,.dday.rd{color:#166534}
 .help-btn{width:44px;height:44px}
+/* v4.3.1: 화면 폭 360px 이하에서는 본문 좌우 여백이 12px로 줄어든다. 가로로 꽉 차는 머리 영역도 같이 -12px로 맞춘다(안 맞추면 4px 넘쳐 가로로 흔들림) */
+@media(max-width:360px){.view>.top,.auth-hero,.intro-hero{margin-left:-12px;margin-right:-12px}}
+/* 눈에 보이는 크기는 그대로 두고 눌리는 영역만 44px 안팎으로 넓힌다 */
+.boxchip{position:relative}.boxchip::after{content:"";position:absolute;left:-6px;right:-6px;top:-10px;bottom:-10px}
+.credit a{display:inline-block;padding:14px 6px;margin:-14px -6px}
