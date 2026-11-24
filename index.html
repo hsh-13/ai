@@ -136,11 +136,11 @@
       <div class="field"><label for="fStatus">진행 상태</label><select id="fStatus"><option>시작 전</option><option>진행 중</option><option>완료</option></select></div>
     </div>
     <div id="tab-appt" class="hidden">
-      <div class="field"><label for="aTitle">약속 이름 *</label><input id="aTitle" placeholder="예: 저녁 약속" oninput="updateApptPreview()"></div>
+      <div class="field"><label for="aTitle">약속 이름 *</label><input id="aTitle" placeholder="예: 알바, 저녁 약속" oninput="updateApptPreview()"></div>
       <div class="field"><label for="aDate">날짜 *</label><input id="aDate" type="date" onchange="updateApptPreview()"></div>
-      <div class="grid2"><div class="field"><label for="aStart">시작</label><input id="aStart" type="time" value="19:00" onchange="updateApptPreview()"></div><div class="field"><label for="aEnd">종료</label><input id="aEnd" type="time" value="22:00" onchange="updateApptPreview()"></div></div>
+      <div class="field"><label for="aHours">줄일 가용 시간(시간) *</label><input id="aHours" type="number" inputmode="decimal" min="0.5" max="16" step="0.5" value="2" oninput="updateApptPreview()" onchange="updateApptPreview()"></div>
       <div class="card" id="apptPreview"></div>
-      <div class="notice" id="apptNote">개인 약속은 이 기기에서 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 하루 안에 끝나는 약속만 입력할 수 있습니다.</div>
+      <div class="notice" id="apptNote">개인 약속은 그날 공부에 쓸 수 없는 시간만큼 가용 시간에서 빼요. 약속 시간 전체가 아니라 실제로 줄어드는 시간만 입력하세요. 이 기기에서 가용 시간 계산에만 쓰이며 AI로 보내지 않아요.</div>
     </div>
     <div class="actions" id="formActions"><button class="btn primary" onclick="saveForm()">저장하기</button><button class="btn" onclick="goBack()">취소</button></div>
   </section>
@@ -164,7 +164,7 @@
 <div class="sheet-backdrop" id="sheet" onclick="if(event.target===this)closeSheet()"><div class="sheet" role="dialog" aria-modal="true" aria-label="무엇을 추가할까요?"><div class="grip"></div><h3>무엇을 추가할까요?</h3>
   <button class="sheet-item main" onclick="openPaste()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M8 5H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M8 12h8M8 16h5"/></svg></i><span><b>공지 붙여넣기 <em class="tag ai">AI</em></b><small>공지 글을 붙여넣으면 마감일과 요구사항을 읽어 줘요</small></span></button>
   <button class="sheet-item" onclick="openAdd()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg></i><span><b>직접 입력</b><small>일정명·마감일·소요 시간을 직접 적어요</small></span></button>
-  <button class="sheet-item" onclick="openAppt()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i><span><b>개인 약속</b><small>알바·약속 시간을 가용 시간에서 빼요</small></span></button>
+  <button class="sheet-item" onclick="openAppt()"><i><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i><span><b>개인 약속</b><small>알바·약속으로 줄어드는 시간을 가용 시간에서 빼요</small></span></button>
   <button class="btn full" onclick="closeSheet()">닫기</button></div></div>
 <div class="modal-backdrop" id="resetModal"><div class="modal" role="dialog" aria-modal="true" aria-label="데이터 초기화"><h3>모든 데이터를 초기화할까요?</h3><p>현재 계정(로그인 전이면 로그인 전 데이터)의 일정, 약속, 가용 시간, 공부 기록(레벨 포함)이 삭제됩니다. 이 작업은 되돌릴 수 없습니다.</p><div class="row2"><button class="btn" onclick="hideResetModal()">취소</button><button class="btn danger" onclick="confirmReset()">초기화하기</button></div></div></div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>

@@ -160,7 +160,7 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
 /* 폼·입력 */
 .field{margin:14px 0}
 .field label,.lab{display:block;font-size:13px;font-weight:700;color:var(--muted);margin-bottom:6px}
-.field input,.field select,.field textarea,.input{width:100%;min-height:48px;border:1px solid #CBD2E1;border-radius:12px;background:#fff;padding:0 14px;font-size:15px;color:var(--ink);outline-offset:2px}
+.field input,.field select,.field textarea,.input{width:100%;min-height:48px;border:1px solid #CBD2E1;border-radius:12px;background:#fff;padding:0 14px;font-size:16px;color:var(--ink);outline-offset:2px}
 .field textarea{min-height:150px;padding:12px 14px;resize:vertical;line-height:1.55}
 .field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
 .cnt{text-align:right;font-size:13px;color:var(--muted);margin-top:5px}
@@ -172,7 +172,7 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
 .calcrow{font-size:16px}.calcrow small{font-size:13px;color:var(--muted)}
 .avail-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px}
 .avail{display:block;text-align:center;font-size:13px;font-weight:700;color:var(--muted)}
-.avail input{width:100%;min-height:44px;margin-top:6px;text-align:center;border:1px solid #CBD2E1;border-radius:10px;font-size:15px;padding:0}
+.avail input{width:100%;min-height:44px;margin-top:6px;text-align:center;border:1px solid #CBD2E1;border-radius:10px;font-size:16px;padding:0}
 
 /* 공지 3단계 */
 .stepper{display:flex;align-items:center;gap:8px;padding:12px 4px}
@@ -289,7 +289,7 @@ h3{font-size:15px;margin:0 0 10px;font-weight:800}
 .auth-hero p{margin:10px 0 0;color:rgba(255,255,255,.9);font-size:15px;line-height:1.55}
 .auth-card{margin-top:-58px;position:relative;z-index:2;padding:22px 18px 16px;box-shadow:0 16px 36px rgba(40,60,140,.2)}
 .auth-h{font-size:19px;margin:0 0 14px}
-.auth-card .field label small{font-weight:500;color:var(--muted)}
+.auth-card .field label small{font-weight:500;color:var(--muted);font-size:12px}
 .auth-links{display:flex;justify-content:center;gap:18px;margin-top:6px}
 .auth-links button{border:0;background:none;color:var(--muted);font-size:13px;text-decoration:underline;min-height:44px;padding:0 4px}
 /* v3.3: 동기화 상태 표시 */
@@ -434,3 +434,4 @@ input,select,textarea{border-width:2px!important;border-color:var(--ink)!importa
 /* 눈에 보이는 크기는 그대로 두고 눌리는 영역만 44px 안팎으로 넓힌다 */
 .boxchip{position:relative}.boxchip::after{content:"";position:absolute;left:-6px;right:-6px;top:-10px;bottom:-10px}
 .credit a{display:inline-block;padding:14px 6px;margin:-14px -6px}
+.day.sel .dn{color:var(--on-accent)}

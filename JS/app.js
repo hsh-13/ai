@@ -5,7 +5,7 @@ const DEFAULT_AVAIL=[2,2,2,2,2,3,3];
 const USER_KEY='aiStudyPlannerUser'; // 현재 로그인한 닉네임(이 브라우저의 세션)
 const ACCOUNTS_KEY='aiStudyPlannerAccounts'; // 이 브라우저의 로컬 계정 {닉네임:{salt,hash}}
 const OVR_KEY='aiStudyPlannerAvailOverride'; // v7: 특정 날짜만 가용 시간 수정
-const APPT_KEY='aiStudyPlannerAppts'; // v3.0: 개인 약속 [{id,title,date,start,end}] — 가용 시간 계산에만 쓰고 AI로 보내지 않는다
+const APPT_KEY='aiStudyPlannerAppts'; // v3.0: 개인 약속 [{id,title,date,hours}] (이전 버전의 start·end 기록도 그대로 읽는다) — 가용 시간 계산에만 쓰고 AI로 보내지 않는다
 const MAX_NOTICE=2000, AI_TIMEOUT_MS=25000; // v3.0: 공지 입력 길이 제한, AI 응답 대기 한도
 // v7: AI 중계 서버 주소. 비워 두면 규칙 기반 Mock으로 동작한다. API 키는 이 파일에 넣지 않는다(중계 서버에서만 보관).
 const AI_ENDPOINT='https://script.google.com/macros/s/AKfycbwaxw3JIuVVy4Oc-aPpK_Zk-CXYYHv0jyiCRQDpST7VfS1nNY4oMJbQcFwdRHYGMu30sA/exec';
@@ -268,12 +268,12 @@ function renderDayCard(plan){
  const k=selectedDate,d=dateObj(k),today=todayKey();
  const cap=availOn(d),used=plan.used[k]||0,sh=plan.short[k]||0,x={cap,used,short:sh};
  const state=sh>0.001?'bad':tightDay(x)?'tight':(used>0?'ok':'none');
- const items=sortAlloc(plan.alloc[k]||[]),al=appts.filter(a=>a.date===k).sort((a,b)=>a.start.localeCompare(b.start)),ah=apptHours(k),has=ovr[k]!==undefined;
+ const items=sortAlloc(plan.alloc[k]||[]),al=appts.filter(a=>a.date===k).sort((a,b)=>String(a.start||'').localeCompare(String(b.start||''))),ah=apptHours(k),has=ovr[k]!==undefined;
  const capSub=has?'직접 수정':(al.length?`기본 ${hh(baseAvail(d))} − 약속 ${hh(ah)}`:'요일 기본값');
  const tg={ok:'good',tight:'warn',bad:'bad',none:'rule'}[state];
  const dnRows=k===today?doneToday().map(a=>`<div class="tl"><i class="tl-bar" style="background:var(--c-ok)"></i><span class="grow"><b class="muted" style="text-decoration:line-through">${esc(a.step||a.title)}</b><small>${a.step?esc(a.title):''}</small></span><span class="tag good">완료</span><span class="num muted">${hh(a.h)}</span></div>`).join(''):'';
  const rows=items.map(a=>{const t=tasks.find(y=>y.id===a.id);if(!t)return '';return `<button class="tl" onclick="openDetail('${t.id}')"><i class="tl-bar" style="background:${typeColor(t.type)}"></i><span class="grow"><b>${esc(a.step||t.title)}</b><small>${a.step?esc(t.title):esc(t.type)}</small></span><span class="num">${hh(a.h)}</span></button>`}).join('');
- const arows=al.map(a=>`<div class="tl"><i class="tl-bar hatch"></i><span class="grow"><b class="muted">${esc(a.title)}</b><small>${a.start}–${a.end} · 개인 약속</small></span><span class="num muted">−${hh((toMin(a.end)-toMin(a.start))/60)}</span></div>`).join('');
+ const arows=al.map(a=>`<div class="tl"><i class="tl-bar hatch"></i><span class="grow"><b class="muted">${esc(a.title)}</b><small>${a.start&&a.end&&!(a.hours>0)?a.start+'–'+a.end+' · ':''}개인 약속</small></span><span class="num muted">−${hh(apptH(a))}</span></div>`).join('');
  const sht=tasks.filter(t=>t.status!=='완료'&&plan.taskShort[t.id]&&(t.date<today?today:t.date)===k),adv=buildAdvice(plan);
  const sbox=sht.length?`<div class="shortbox"><b>배정하지 못한 시간 ${hh(sht.reduce((a,t)=>a+plan.taskShort[t.id],0))}</b><small>${sht.map(t=>esc(t.title)+' '+hh(plan.taskShort[t.id])).join(' · ')}</small><details><summary>조정 방법 보기</summary>${sht.map(t=>{const a=adv.find(y=>y.id===t.id);return a?`<p><b>${esc(t.title)}</b> 마감까지 ${a.days}일 동안 하루 ${fh(a.perDay)}씩 더 확보하거나, 소요 시간을 줄이거나, 다른 일정을 미뤄야 해요.</p>`:''}).join('')}</details></div>`:'';
  const wd=DAY_NAMES[(d.getDay()+6)%7];
@@ -283,8 +283,8 @@ function renderDayCard(plan){
 }
 function renderDayAvail(){
  const el=$('dayAvail');if(!el)return;
- const d=dateObj(selectedDate),has=ovr[selectedDate]!==undefined,al=appts.filter(x=>x.date===selectedDate).sort((x,y)=>x.start.localeCompare(y.start));
- el.innerHTML=`<div class="lbl">이 날 가용 시간</div><p class="small muted" style="margin:2px 0 10px">${has?'직접 수정한 값이에요. 개인 약속 시간은 따로 빠지지 않아요.':'요일 기본값에서 개인 약속 시간을 뺀 값이에요.'}</p><div class="row"><label class="sr" for="ovrIn">가용 시간(시간)</label><input id="ovrIn" class="ovr num" type="number" min="0" max="16" step="0.5" value="${availOn(d)}" onchange="setOvr('${selectedDate}',this.value)"><span class="muted">시간</span><div class="grow"></div><button class="btn sm" onclick="setOvr('${selectedDate}','')">기본값으로</button></div>${al.length?`<div style="margin-top:8px">${al.map(x=>`<div class="line"><span>${esc(x.title)} · ${x.start}–${x.end}</span><button class="btn sm" onclick="deleteAppt('${x.id}')" aria-label="${esc(x.title)} 약속 삭제">삭제</button></div>`).join('')}</div>`:''}<button class="btn full" onclick="openAppt()">＋ 개인 약속 추가</button>`;
+ const d=dateObj(selectedDate),has=ovr[selectedDate]!==undefined,al=appts.filter(x=>x.date===selectedDate).sort((x,y)=>String(x.start||'').localeCompare(String(y.start||'')));
+ el.innerHTML=`<div class="lbl">이 날 가용 시간</div><p class="small muted" style="margin:2px 0 10px">${has?'직접 수정한 값이에요. 개인 약속 시간은 따로 빠지지 않아요.':'요일 기본값에서 개인 약속 시간을 뺀 값이에요.'}</p><div class="row"><label class="sr" for="ovrIn">가용 시간(시간)</label><input id="ovrIn" class="ovr num" type="number" min="0" max="16" step="0.5" value="${availOn(d)}" onchange="setOvr('${selectedDate}',this.value)"><span class="muted">시간</span><div class="grow"></div><button class="btn sm" onclick="setOvr('${selectedDate}','')">기본값으로</button></div>${al.length?`<div style="margin-top:8px">${al.map(x=>`<div class="line"><span>${esc(x.title)} · ${x.hours>0?'−'+hh(apptH(x)):x.start+'–'+x.end}</span><button class="btn sm" onclick="deleteAppt('${x.id}')" aria-label="${esc(x.title)} 약속 삭제">삭제</button></div>`).join('')}</div>`:''}<button class="btn full" onclick="openAppt()">＋ 개인 약속 추가</button>`;
 }
 function renderLoad(elId,base,plan,days){
  const el=$(elId);if(!el)return;
@@ -376,10 +376,10 @@ function saveTask(){
  persist();focusDate(date);navigate(editing?'list':'plan');
 }
 function saveAppt(){
- const title=$('aTitle').value.trim(),date=$('aDate').value,st=$('aStart').value,en=$('aEnd').value;
- if(!title||!date||!st||!en){toast('이름, 날짜, 시작·종료 시간을 입력해 주세요.');return}
- if(toMin(en)<=toMin(st)){toast('종료 시간이 시작 시간보다 늦어야 해요.');return}
- appts.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),title,date,start:st,end:en});
+ const title=$('aTitle').value.trim(),date=$('aDate').value,hours=Number($('aHours').value);
+ if(!title||!date||!$('aHours').value){toast('이름, 날짜, 줄일 시간을 입력해 주세요.');return}
+ if(!(hours>=0.5&&hours<=16)){toast('줄일 시간은 0.5~16시간 사이로 입력해 주세요.');return}
+ appts.push({id:crypto.randomUUID?crypto.randomUUID():String(Date.now()),title,date,hours:Math.round(hours*2)/2});
  persistAppts();commentCache=null;focusDate(date);navigate('plan');toast('개인 약속을 추가했어요. 그날 가용 시간에서 뺍니다.');
 }
 function deleteAppt(id){appts=appts.filter(x=>x.id!==id);persistAppts();commentCache=null;refresh();toast('개인 약속을 삭제했어요.')}
@@ -777,14 +777,15 @@ function init(){
 function openSheet(){$('sheet').classList.add('show');document.querySelector('#sheet .sheet-item').focus()}
 function closeSheet(){const el=$('sheet');if(el)el.classList.remove('show')}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSheet()});
-function clearForm(){['fTitle','fDate','aTitle','aDate','noticeInput'].forEach(id=>$(id).value='');$('fType').value='과제';$('fImportance').value='보통';$('fEffort').value='60';$('fStatus').value='시작 전';$('aStart').value='19:00';$('aEnd').value='22:00';draft=null;extractCtl=null;setPanel('input');updateNoticeCount();updateApptPreview()}
+function clearForm(){['fTitle','fDate','aTitle','aDate','noticeInput'].forEach(id=>$(id).value='');$('fType').value='과제';$('fImportance').value='보통';$('fEffort').value='60';$('fStatus').value='시작 전';$('aHours').value='2';draft=null;extractCtl=null;setPanel('input');updateNoticeCount();updateApptPreview()}
 function scoreTask(t){const days=Math.ceil((dateObj(t.date)-dateObj(isoDate(new Date())))/86400000);const deadline=days<0?100:days===0?100:days===1?85:days<=3?70:days<=7?50:25;const importance={높음:100,보통:60,낮음:30}[t.importance]||60;const effort=t.effort>=300?90:t.effort>=180?75:t.effort>=120?60:t.effort>=60?40:25;let score=Math.round(deadline*.5+importance*.3+effort*.2);if(t.status==='완료')score=0;return {score,days}}
 function showResetModal(){$('resetModal').classList.add('show')}function hideResetModal(){$('resetModal').classList.remove('show')}
 /* ===== v6: 가용 시간 · 주간 부하 · 예시 데이터 ===== */
 const DAY_NAMES=['월','화','수','목','금','토','일'];
 function fh(h){return (Math.round(h*10)/10)+'시간'}
 function toMin(t){const [h,m]=String(t).split(':').map(Number);return (h||0)*60+(m||0)}
-function apptHours(k){return appts.filter(a=>a.date===k).reduce((x,a)=>x+Math.max(0,(toMin(a.end)-toMin(a.start))/60),0)}
+function apptH(a){const h=Number(a&&a.hours);if(h>0)return h;return a&&a.start&&a.end?Math.max(0,(toMin(a.end)-toMin(a.start))/60):0}
+function apptHours(k){return appts.filter(a=>a.date===k).reduce((x,a)=>x+apptH(a),0)}
 function baseAvail(d){return Number(avail[(d.getDay()+6)%7])||0}
 // 가용 시간 = 날짜별 직접 수정값(있으면 그 값) 또는 요일 기본값 − 그날 개인 약속 시간. 계산은 코드가 한다.
 function availOn(d){const k=isoDate(d);if(ovr[k]!==undefined)return Number(ovr[k])||0;return Math.max(0,baseAvail(d)-apptHours(k))}
@@ -829,9 +830,9 @@ function buildAdvice(plan){
  });
 }
 function updateApptPreview(){
- const el=$('apptPreview');if(!el)return;const date=$('aDate').value,st=$('aStart').value,en=$('aEnd').value;
- if(!date||!st||!en||toMin(en)<=toMin(st)){el.innerHTML='<div class="empty">날짜와 시간을 입력하면 그날 가용 시간이 어떻게 바뀌는지 보여줍니다.</div>';return}
- const d=dateObj(date),k=isoDate(d),add=(toMin(en)-toMin(st))/60,before=availOn(d),has=ovr[k]!==undefined,after=has?before:Math.max(0,baseAvail(d)-apptHours(k)-add);
+ const el=$('apptPreview');if(!el)return;const date=$('aDate').value,add=Math.round(Number($('aHours').value)*2)/2;
+ if(!date||!(add>=0.5&&add<=16)){el.innerHTML='<div class="empty">날짜와 줄일 시간을 입력하면 그날 가용 시간이 어떻게 바뀌는지 보여줍니다.</div>';return}
+ const d=dateObj(date),k=isoDate(d),before=availOn(d),has=ovr[k]!==undefined,after=has?before:Math.max(0,baseAvail(d)-apptHours(k)-add);
  el.innerHTML=`<div class="card-title"><span>이 날 가용 시간 변화</span><span class="tag rule">규칙</span></div><div class="calcrow">${hh(before)} → <b>${hh(after)}</b> <small>(약속 ${hh(add)} 반영)</small></div>${has?'<p class="tiny" style="margin:6px 0 0">이 날은 직접 수정한 가용 시간이 있어 약속을 추가해도 값이 바뀌지 않습니다.</p>':''}`;
 }
 function setOvr(k,v){if(v===''||v===null){delete ovr[k]}else{ovr[k]=Math.min(16,Math.max(0,Number(v)||0))}Store.set(OVR_KEY,ovr);commentCache=null;renderPlan();toast(v===''?'기본값으로 되돌렸습니다.':'이 날의 가용 시간이 저장되었습니다.')}
@@ -1097,7 +1098,7 @@ const NOTES={
  auth:'닉네임과 일정은 팀이 만든 구글 시트에 저장돼요. 다른 기기에서도 같은 닉네임으로 로그인할 수 있어요. 비밀번호는 서버에서 해시로 바꿔 저장하지만 팀원이 시트에서 일정 데이터를 볼 수 있으니, 다른 서비스의 비밀번호는 쓰지 마세요. 비밀번호를 잊으면 찾을 수 없어요.',
  myNote:'로그인 정보와 일정은 팀이 만든 구글 시트에 저장되고, 이 기기에도 같은 데이터가 임시로 저장돼요. 보안 기능으로 보호되는 서비스가 아니니 중요한 개인정보는 넣지 마세요.',
  resetNote:'이 계정의 일정·약속·가용 시간·공부 기록(레벨 포함)을 초기화합니다. 서버에도 반영돼요.',
- apptNote:'개인 약속은 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 다만 계정 데이터로 구글 시트에는 저장돼요. 하루 안에 끝나는 약속만 입력할 수 있습니다.',
+ apptNote:'개인 약속은 가용 시간 계산에만 쓰이며 AI로 보내지 않아요. 다만 계정 데이터로 구글 시트에는 저장돼요. 약속 시간이 아니라 공부에 못 쓰게 되는 시간만 입력하면 돼요.',
  termsLogin:'닉네임과 비밀번호로 가입·로그인하는 기능이며, 닉네임·비밀번호 해시·일정 데이터는 이 서비스를 운영하는 팀의 구글 시트에 저장되어 다른 기기에서도 같은 계정을 쓸 수 있습니다. 시트를 볼 수 있는 팀원은 닉네임과 일정 데이터를 열람할 수 있습니다. 로그인할 때 비밀번호가 서버(Google Apps Script)에 전달되어 해시로 바뀐 뒤 저장되므로 다른 서비스의 비밀번호를 쓰지 마세요. 프로토타입이라 보안 기능으로 보호되지 않으며, 비밀번호를 잊으면 복구할 수 없습니다.',
  privStore:'닉네임, 비밀번호 해시, 일정 데이터는 이 서비스를 운영하는 팀이 만든 구글 시트(Google Sheets)에 저장됩니다. 시트를 볼 수 있는 팀원이 이 데이터를 열람할 수 있습니다. 로그인할 때 비밀번호는 HTTPS로 서버(Google Apps Script)에 전달되어 해시로 바뀌며, 비밀번호 원문은 시트에 저장하지 않습니다. 같은 데이터가 이 기기에도 임시로 저장됩니다.',
  privDelete:'마이의 “데이터 전체 초기화”는 현재 계정의 일정, 약속, 가용 시간, 공부 기록(레벨 포함)을 지우고 서버에도 반영합니다. “계정 삭제”는 시트에서 계정과 그 계정의 모든 데이터를 지웁니다. 이 기기에 임시 저장된 데이터는 브라우저의 사이트 데이터 삭제로 지워집니다.'
