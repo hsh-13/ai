@@ -63,7 +63,7 @@ function sprHtml(eq,opt){ // eq={cat,head,face,back}(장착한 아이템 id). op
 }
 function sprSet(el,name,f){el.style.setProperty('--fx',f);el.style.setProperty('--fy',SPR_ANIM[name].r)}
 function sprStep(){
- if(document.hidden)return;
+ if(document.hidden||!motionOn())return;
  const now=Date.now();
  document.querySelectorAll('.spr[data-anim]').forEach(el=>{
   const mode=el.dataset.anim;let s=el._s;
@@ -82,7 +82,17 @@ function sprStep(){
   sprSet(el,SPR_ANIM[mode]?mode:'sit',s.f%a.n);s.f++;s.t=now+a.ms; // 정해진 동작은 계속 반복
  });
 }
-if(!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches))setInterval(sprStep,60); // 움직임 줄이기 설정이면 가만히 앉은 그림만 보여 준다
+setInterval(sprStep,60); // 움직일지는 sprStep 안에서 motionOn()으로 정한다
+// 고양이 움직임: 기기 단위 화면 설정(계정·서버와 무관). 직접 고른 값이 있으면 그 값, 없으면 기기의 '동작 줄이기' 설정을 따른다.
+const MOTION_KEY='aiStudyPlannerMotion';let motionMem='';
+function osReduce(){return !!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)}
+function motionPref(){try{const v=localStorage.getItem(MOTION_KEY);if(v==='on'||v==='off')return v}catch(e){}return motionMem}
+function motionOn(){const p=motionPref();return p?p==='on':!osReduce()}
+function setMotion(on){motionMem=on?'on':'off';try{localStorage.setItem(MOTION_KEY,motionMem)}catch(e){}
+ if(!on)document.querySelectorAll('.spr[data-anim]').forEach(el=>{el._s=null;sprSet(el,'sit',0)}); // 끄면 하던 동작을 멈추고 앉은 그림으로
+ renderMotion();toast(on?'고양이가 움직여요.':'고양이가 가만히 있어요.')}
+function renderMotion(){const el=$('motionCard');if(!el)return;const on=motionOn(),note=osReduce()&&!motionPref();
+ el.innerHTML=`<h3>화면 설정</h3><div class="line" style="border:0"><span id="motionLbl">고양이 움직임</span><button class="sw" role="switch" aria-checked="${on}" aria-labelledby="motionLbl" onclick="setMotion(!motionOn())"><i></i></button></div><p class="tiny" style="margin:6px 0 0">${on?'끄면 고양이가 가만히 앉아 있어요.':'켜면 고양이가 가끔 몸을 움직여요.'}${note?' 이 기기의 “동작 줄이기” 설정이 켜져 있어 지금은 멈춰 있어요. 스위치를 켜면 이 앱에서만 움직여요.':''}</p>`}
 const BOX_SVG='<svg viewBox="0 0 96 96" aria-hidden="true"><rect x="18" y="48" width="60" height="40" rx="6" fill="#E8A33D"/><rect x="43" y="48" width="10" height="40" fill="#C2394F"/><g class="bx-lid"><rect x="12" y="30" width="72" height="20" rx="5" fill="#F2B544"/><rect x="43" y="30" width="10" height="20" fill="#C2394F"/><path d="M48 30c-7-13-20-11-16-4 3 5 11 4 16 4zM48 30c7-13 20-11 16-4-3 5-11 4-16 4z" fill="none" stroke="#C2394F" stroke-width="4" stroke-linecap="round"/></g></svg>';
 // 저장 데이터 정리: 이전 버전(items 등이 없는 데이터)도 읽는다. rewardLv가 없으면 1로 보고, 이미 오른 레벨만큼 보상을 받는다.
 function normGame(g){
@@ -136,7 +146,7 @@ function renderView(v){
  if(v==='today')renderToday();
  else if(v==='plan')renderPlan();
  else if(v==='list')renderList();
- else if(v==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile()}
+ else if(v==='settings'){$('settingsCount').textContent=tasks.length+'개';renderAvail();renderProfile();renderMotion()}
  else if(v==='detail')renderDetail();
  else if(v==='auth')renderAuth();
  else if(v==='intro')renderIntro();
