@@ -575,8 +575,8 @@ function renderGameCard(){
  const el=$('gameCard');if(!el)return;
  if(!user){el.innerHTML='';return}
  const li=levelInfo(xpTotal()),today=studyMinOn(todayKey());
- el.innerHTML=`<div class="gcard"><div class="ghead"><div class="gch">${myAvatar(88,'idle')}<span class="glv">Lv.${li.level}</span></div><div class="grow"><p class="gtitle">나의 공부 캐릭터</p><p class="gsub">${timer?'공부 중':'오늘 공부 '+(today?fmtMin(today):'0분')}${!timer&&game.pending.length?` · <button class="boxchip" onclick="openTimer()">상자 ${game.pending.length}개 열기</button>`:''}</p>${xpBar(li)}</div></div>
- ${timer?`<button class="btn primary full gbtn" onclick="openTimer()"><span data-clock="full">${fmtClock(Date.now()-timer.start)}</span> · 타이머 열기</button>`:`<button class="btn primary full gbtn" onclick="openTimer()">공부 시작</button>`}<button class="btn full gbtn2" onclick="openCloset()">꾸미기 · ${game.items.length}/${ITEMS.length}</button></div>`;
+ el.innerHTML=`<div class="gcard"><div class="ghead"><div class="gch">${myAvatar(88,'idle')}<span class="glv">Lv.${li.level}</span></div><div class="grow"><p class="gtitle">공부 기록</p><p class="gsub">${timer?'공부 중':'오늘 공부 '+(today?fmtMin(today):'0분')}${!timer&&game.pending.length?` · <button class="boxchip" onclick="openTimer()">상자 ${game.pending.length}개 열기</button>`:''}</p>${xpBar(li)}</div></div>
+ ${timer?`<button class="btn primary full gbtn" onclick="openTimer()"><span data-clock="full">${fmtClock(Date.now()-timer.start)}</span> · 타이머 열기</button>`:`<button class="btn primary full gbtn" onclick="openTimer()">공부 시작</button>`}</div>`;
 }
 function renderTimer(){
  syncTick();
